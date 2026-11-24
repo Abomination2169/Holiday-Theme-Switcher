@@ -1,4 +1,4 @@
-# Holiday Theme Switcher
+# 📅 Holiday Theme Switcher
 
 ![Holiday Theme Switcher preview](HolidayThemeSwitcher-README.png)
 
