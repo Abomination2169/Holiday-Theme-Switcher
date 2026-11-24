@@ -1,5 +1,6 @@
 #include "Particles/menuParticles.hpp"
 
+#include "System/IntPtr.hpp"
 #include "UnityEngine/Bounds.hpp"
 #include "UnityEngine/Camera.hpp"
 #include "UnityEngine/Color.hpp"
@@ -12,11 +13,13 @@
 #include "UnityEngine/MonoBehaviour.hpp"
 #include "UnityEngine/ParticleSystem.hpp"
 #include "UnityEngine/ParticleSystemRenderer.hpp"
+#include "UnityEngine/ParticleSystemSimulationSpace.hpp"
 #include "UnityEngine/Rendering/MeshUpdateFlags.hpp"
 #include "UnityEngine/Resources.hpp"
 #include "UnityEngine/Shader.hpp"
 #include "UnityEngine/Texture2D.hpp"
 #include "UnityEngine/TextureFormat.hpp"
+#include "UnityEngine/TextureWrapMode.hpp"
 #include "UnityEngine/Time.hpp"
 #include "UnityEngine/Transform.hpp"
 #include "UnityEngine/Vector2.hpp"
@@ -35,6 +38,9 @@ DECLARE_CLASS_CODEGEN(Seasonal, MenuParticleController, UnityEngine::MonoBehavio
     DECLARE_INSTANCE_FIELD(UnityEngine::Mesh*, particleMesh);
     DECLARE_INSTANCE_FIELD(UnityEngine::Material*, particleMaterial);
     DECLARE_INSTANCE_FIELD(UnityEngine::Texture2D*, ownedTexture);
+    DECLARE_INSTANCE_FIELD(Array<UnityEngine::ParticleSystem*>*, nativeSystems);
+    DECLARE_INSTANCE_FIELD(Array<UnityEngine::Material*>*, nativeMaterials);
+    DECLARE_INSTANCE_FIELD(Array<UnityEngine::Texture2D*>*, nativeTextures);
     DECLARE_INSTANCE_METHOD(void, LateUpdate);
     DECLARE_INSTANCE_METHOD(void, OnDestroy);
 };
@@ -67,6 +73,7 @@ namespace {
     struct Emitter {
         MenuParticlePattern pattern;
         std::vector<Particle> particles;
+        std::vector<std::vector<ParticleSystem_Particle>> nativeBatches;
         std::mt19937 random{std::random_device{}()};
         float emissionRemainder = 0.0f;
         int nextSlot = 0;
@@ -95,14 +102,82 @@ namespace {
 
     std::unordered_map<Seasonal::MenuParticleController*, std::unique_ptr<Emitter>> emitters;
 
-    Material* FindDustMaterial() {
+    ParticleSystem* FindDustSystem() {
         for (auto* particle : Resources::FindObjectsOfTypeAll<ParticleSystem*>()) {
-            if (!particle || particle->name != "DustPS") continue;
-            auto* renderer = particle->GetComponent<ParticleSystemRenderer*>();
-            auto* material = renderer ? renderer->get_sharedMaterial().ptr() : nullptr;
-            if (material && material->get_mainTexture()) return material;
+            if (particle && particle->name == "DustPS") return particle;
         }
         return nullptr;
+    }
+
+    // Unity 6 strips the texture-sheet setters used by the old port. Give
+    // each atlas frame its own DustPS clone with the original vertex streams.
+    bool CreateNativeDustRenderers(GameObject* root, Seasonal::MenuParticleController* controller,
+                                   ParticleSystem* dust, Material* dustMaterial, Texture2D* sheet,
+                                   Emitter& emitter, int frames) {
+        if (!dustMaterial || !sheet || !sheet->get_isReadable()) return false;
+        const int width = sheet->get_width();
+        const int height = sheet->get_height();
+        if (width <= 0 || height <= 0 || width % frames != 0) return false;
+
+        const int frameWidth = width / frames;
+        const int capacity = (emitter.pattern.capacity + frames - 1) / frames;
+        ArrayW<ParticleSystem*> systems(frames);
+        ArrayW<Material*> materials(frames);
+        ArrayW<Texture2D*> textures(frames);
+        root->SetActive(false);
+        int frame = 0;
+        for (; frame < frames; ++frame) {
+            auto* clone = Object::Instantiate(dust->get_gameObject().ptr(), root->get_transform().ptr(), false);
+            if (!clone) break;
+            clone->set_name("ChristmasEveCrystalFrame");
+            auto* particles = clone->GetComponent<ParticleSystem*>();
+            auto* renderer = clone->GetComponent<ParticleSystemRenderer*>();
+            if (!particles || !renderer) {
+                Object::Destroy(clone);
+                break;
+            }
+            auto* tile = Texture2D::New_ctor(frameWidth, height, TextureFormat::RGBA32, false);
+            tile->set_wrapMode(TextureWrapMode::Clamp);
+            tile->SetPixels(sheet->GetPixels(frame * frameWidth, 0, frameWidth, height));
+            tile->Apply(false);
+            auto* material = Object::Instantiate(dustMaterial);
+            material->set_mainTexture(tile);
+            renderer->set_sharedMaterial(material);
+
+            auto main = particles->main;
+            main.set_playOnAwake(false);
+            main.set_simulationSpace(ParticleSystemSimulationSpace::World);
+            main.set_maxParticles(capacity);
+            particles->emission.set_enabled(false);
+            clone->SetActive(true);
+            systems[frame] = particles;
+            materials[frame] = material;
+            textures[frame] = tile;
+        }
+        if (frame != frames) {
+            for (int i = 0; i < frame; ++i) {
+                auto* child = systems[i]->get_gameObject().ptr();
+                child->SetActive(false);
+                Object::Destroy(child);
+                Object::Destroy(materials[i]);
+                Object::Destroy(textures[i]);
+            }
+            root->SetActive(true);
+            return false;
+        }
+
+        controller->nativeSystems = systems.operator->();
+        controller->nativeMaterials = materials.operator->();
+        controller->nativeTextures = textures.operator->();
+        emitter.nativeBatches.resize(frames);
+        for (auto& batch : emitter.nativeBatches) batch.reserve(capacity);
+        root->SetActive(true);
+        for (auto* particles : systems) {
+            particles->Play(false);
+            particles->Pause(false);
+            particles->Clear(false);
+        }
+        return true;
     }
 
     Texture2D* CreateSoftFlakeTexture() {
@@ -156,13 +231,9 @@ namespace {
 UnityEngine::GameObject* Seasonal::CreateMenuParticles(const char* name, const MenuParticlePattern& pattern,
                                                        UnityEngine::Texture2D* spriteSheet, int frames) {
     using namespace UnityEngine;
-    auto* dustMaterial = (!spriteSheet || pattern.useDustMaterial) ? FindDustMaterial() : nullptr;
-    auto* crystalTemplate = pattern.useDustMaterial ? dustMaterial : nullptr;
-    auto* shader = crystalTemplate ? nullptr : Shader::Find("Sprites/Default").ptr();
-    if (!crystalTemplate && !shader) {
-        if (spriteSheet) Object::Destroy(spriteSheet);
-        return nullptr;
-    }
+    auto* dust = (!spriteSheet || pattern.useNativeDustRenderer) ? FindDustSystem() : nullptr;
+    auto* renderer = dust ? dust->GetComponent<ParticleSystemRenderer*>() : nullptr;
+    auto* dustMaterial = renderer ? renderer->get_sharedMaterial().ptr() : nullptr;
 
     auto* root = GameObject::New_ctor(name);
     auto* controller = root->AddComponent<MenuParticleController*>();
@@ -175,6 +246,20 @@ UnityEngine::GameObject* Seasonal::CreateMenuParticles(const char* name, const M
     auto emitter = std::make_unique<Emitter>();
     emitter->pattern = pattern;
     emitter->particles.resize(pattern.capacity);
+    if (pattern.useNativeDustRenderer &&
+        CreateNativeDustRenderers(root, controller, dust, dustMaterial, spriteSheet, *emitter, frames)) {
+        Object::Destroy(spriteSheet);
+        emitters.emplace(controller, std::move(emitter));
+        return root;
+    }
+
+    auto* shader = Shader::Find("Sprites/Default").ptr();
+    if (!shader) {
+        if (spriteSheet) Object::Destroy(spriteSheet);
+        Object::Destroy(root);
+        return nullptr;
+    }
+
     controller->ownedTexture = spriteSheet;
     Texture* texture = spriteSheet;
     if (!texture && dustMaterial) texture = dustMaterial->get_mainTexture().ptr();
@@ -183,15 +268,9 @@ UnityEngine::GameObject* Seasonal::CreateMenuParticles(const char* name, const M
         texture = controller->ownedTexture;
     }
 
-    // The original crystal flakes used a private copy of DustPS's material.
-    // Keep its tint and blend settings when replacing the texture.
-    controller->particleMaterial = crystalTemplate
-        ? Object::Instantiate(crystalTemplate)
-        : Material::New_ctor(shader);
+    controller->particleMaterial = Material::New_ctor(shader);
     controller->particleMaterial->set_mainTexture(texture);
-    if (!crystalTemplate) {
-        controller->particleMaterial->SetColor(StringW("_Color"), Color(1, 1, 1, 1));
-    }
+    controller->particleMaterial->SetColor(StringW("_Color"), Color(1, 1, 1, 1));
 
     controller->particleMesh = Mesh::New_ctor();
     controller->particleMesh->MarkDynamic();
@@ -265,7 +344,11 @@ void Seasonal::MenuParticleController::LateUpdate() {
         emitter.nextSlot = (emitter.nextSlot + 1) % pattern.capacity;
     }
 
+    const bool useNativeRenderer = !emitter.nativeBatches.empty();
+    for (auto& batch : emitter.nativeBatches) batch.clear();
     ArrayW<Vector3> positions(vertexBuffer);
+    Color32 white;
+    if (useNativeRenderer) white._ctor(255, 255, 255, 255);
     for (int i = 0; i < pattern.capacity; ++i) {
         auto& particle = emitter.particles[i];
         const int vertex = i * 4;
@@ -284,12 +367,25 @@ void Seasonal::MenuParticleController::LateUpdate() {
                                    up.z * cosine - right.z * sine);
             const float restingY = floorY + std::abs(horizontal.y) + std::abs(vertical.y);
             Advance(particle, pattern, dt, wind, restingY);
+            const float displayedAngle = particle.rotation;
             if (!particle.grounded) particle.rotation += particle.spin * dt;
 
             if (particle.remaining > 0.0f) {
                 const Vector3 center(particle.position.x,
                                      particle.grounded ? restingY : std::max(particle.position.y, restingY),
                                      particle.position.z);
+                if (useNativeRenderer) {
+                    auto& batch = emitter.nativeBatches[i % emitter.nativeBatches.size()];
+                    auto& flake = batch.emplace_back();
+                    flake.set_position(center);
+                    flake.set_startSize(particle.size);
+                    flake.set_startLifetime(pattern.lifetime);
+                    flake.set_remainingLifetime(particle.remaining);
+                    flake.set_startColor(white);
+                    flake.set_randomSeed(static_cast<uint32_t>(i + 1));
+                    flake.set_rotation3D(Vector3(0.0f, 0.0f, displayedAngle * (360.0f / fullTurn)));
+                    continue;
+                }
                 positions[vertex] = Vector3(center.x - horizontal.x - vertical.x,
                                             center.y - horizontal.y - vertical.y,
                                             center.z - horizontal.z - vertical.z);
@@ -305,8 +401,19 @@ void Seasonal::MenuParticleController::LateUpdate() {
                 continue;
             }
         }
-        for (int j = 0; j < 4; ++j) positions[vertex + j] = Vector3(0, 0, 0);
+        if (!useNativeRenderer) {
+            for (int j = 0; j < 4; ++j) positions[vertex + j] = Vector3(0, 0, 0);
+        }
     }
+    if (useNativeRenderer) {
+        ArrayW<ParticleSystem*> systems(nativeSystems);
+        for (size_t i = 0; i < emitter.nativeBatches.size(); ++i) {
+            auto& batch = emitter.nativeBatches[i];
+            systems[i]->SetParticlesWithNativeArray(System::IntPtr(batch.data()), batch.size(), batch.size(), 0);
+        }
+        return;
+    }
+
     particleMesh->SetVertices(positions, 0, pattern.capacity * 4,
                                Rendering::MeshUpdateFlags::DontRecalculateBounds);
 }
@@ -314,8 +421,12 @@ void Seasonal::MenuParticleController::LateUpdate() {
 void Seasonal::MenuParticleController::OnDestroy() {
     const auto found = emitters.find(this);
     if (found == emitters.end()) return;
-    UnityEngine::Object::Destroy(particleMesh);
-    UnityEngine::Object::Destroy(particleMaterial);
+    if (nativeMaterials) {
+        for (auto* material : ArrayW<UnityEngine::Material*>(nativeMaterials)) UnityEngine::Object::Destroy(material);
+        for (auto* texture : ArrayW<UnityEngine::Texture2D*>(nativeTextures)) UnityEngine::Object::Destroy(texture);
+    }
+    if (particleMesh) UnityEngine::Object::Destroy(particleMesh);
+    if (particleMaterial) UnityEngine::Object::Destroy(particleMaterial);
     if (ownedTexture) UnityEngine::Object::Destroy(ownedTexture);
     emitters.erase(found);
 }

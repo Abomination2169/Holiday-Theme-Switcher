@@ -35,7 +35,7 @@ namespace ChristmasEve::snowflakes {
             .capacity = 550, .rate = 48.0f, .lifetime = 10.0f, .height = 7.0f,
             .minSize = 0.055f, .maxSize = 0.055f, .gravityMultiplier = 0.10f,
             .fallSpeed = 0.0f, .wind = 0.0f, .flutter = 0.045f, .spin = 0.45f,
-            .useDustMaterial = true
+            .useNativeDustRenderer = true
         }, crystalTexture, 5);
         if (!fine || !medium || !crystal) DestroySnowflakes();
     }
