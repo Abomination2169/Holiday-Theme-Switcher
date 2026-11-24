@@ -13,6 +13,7 @@
 #include "UnityEngine/MonoBehaviour.hpp"
 #include "UnityEngine/ParticleSystem.hpp"
 #include "UnityEngine/ParticleSystemRenderer.hpp"
+#include "UnityEngine/ParticleSystemGradientMode.hpp"
 #include "UnityEngine/ParticleSystemSimulationSpace.hpp"
 #include "UnityEngine/Rendering/MeshUpdateFlags.hpp"
 #include "UnityEngine/Resources.hpp"
@@ -25,11 +26,13 @@
 #include "UnityEngine/Vector2.hpp"
 #include "UnityEngine/Vector3.hpp"
 #include "custom-types/shared/macros.hpp"
+#include "paper2_scotland2/shared/logger.hpp"
 
 #include <algorithm>
 #include <cmath>
 #include <memory>
 #include <random>
+#include <string>
 #include <unordered_map>
 #include <vector>
 
@@ -50,6 +53,8 @@ DEFINE_TYPE(Seasonal, MenuParticleController);
 namespace {
     using namespace UnityEngine;
     using Seasonal::MenuParticlePattern;
+
+    constexpr auto ParticleLogger = Paper::ConstLoggerContext("seasonalthemes");
 
     constexpr float fullTurn = 6.2831853f;
     constexpr float gravity = 9.81f;
@@ -204,9 +209,13 @@ namespace {
         const float dz = eye.z - particle.position.z;
         const float distance = std::max(0.001f, std::sqrt(dx * dx + dy * dy + dz * dz));
         const float phase = particle.phase + angle + (3.1f * dx + 1.7f * dy + 2.2f * dz) / distance;
-        const auto channel = [phase](float offset) {
-            // Pale spectral highlights leave the original white ice detail readable.
-            return static_cast<uint8_t>(255.0f * (0.84f + 0.16f * std::cos(phase + offset)));
+        const float facing = 0.5f + 0.5f * std::cos(phase);
+        const float facingSquared = facing * facing;
+        const float glint = facingSquared * facingSquared;
+        const float hue = 2.0f * particle.phase + 1.6f * phase;
+        const auto channel = [glint, hue](float offset) {
+            // Most viewing angles show white ice. The color peaks in a narrow glint.
+            return static_cast<uint8_t>(255.0f * (1.0f - 0.34f * glint * (0.5f - 0.5f * std::cos(hue + offset))));
         };
         Color32 color;
         color._ctor(channel(0.0f), channel(fullTurn / 3.0f), channel(2.0f * fullTurn / 3.0f), 255);
@@ -262,11 +271,20 @@ UnityEngine::GameObject* Seasonal::CreateMenuParticles(const char* name, const M
     auto emitter = std::make_unique<Emitter>();
     emitter->pattern = pattern;
     emitter->particles.resize(pattern.capacity);
-    if (pattern.useNativeDustRenderer &&
-        CreateNativeDustRenderers(root, controller, dust, dustMaterial, spriteSheet, *emitter, frames)) {
-        Object::Destroy(spriteSheet);
-        emitters.emplace(controller, std::move(emitter));
-        return root;
+    if (pattern.useNativeDustRenderer) {
+        if (CreateNativeDustRenderers(root, controller, dust, dustMaterial, spriteSheet, *emitter, frames)) {
+            auto shader = dustMaterial->get_shader();
+            const auto startColor = dust->main.get_startColor();
+            ParticleLogger.info("[CrystalSnow] DustPS shader={}, startColorMode={}, minRGB=({},{},{}), maxRGB=({},{},{})",
+                shader ? static_cast<std::string>(shader->get_name()) : std::string("unavailable"),
+                static_cast<int>(startColor.m_Mode),
+                startColor.m_ColorMin.r, startColor.m_ColorMin.g, startColor.m_ColorMin.b,
+                startColor.m_ColorMax.r, startColor.m_ColorMax.g, startColor.m_ColorMax.b);
+            Object::Destroy(spriteSheet);
+            emitters.emplace(controller, std::move(emitter));
+            return root;
+        }
+        ParticleLogger.info("[CrystalSnow] Using sprite renderer fallback");
     }
 
     auto* shader = Shader::Find("Sprites/Default").ptr();
