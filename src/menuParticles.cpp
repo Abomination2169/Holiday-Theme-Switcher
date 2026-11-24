@@ -35,6 +35,7 @@
 
 DECLARE_CLASS_CODEGEN(Seasonal, MenuParticleController, UnityEngine::MonoBehaviour) {
     DECLARE_INSTANCE_FIELD(Array<UnityEngine::Vector3>*, vertexBuffer);
+    DECLARE_INSTANCE_FIELD(Array<UnityEngine::Color32>*, crystalColorBuffer);
     DECLARE_INSTANCE_FIELD(UnityEngine::Mesh*, particleMesh);
     DECLARE_INSTANCE_FIELD(UnityEngine::Material*, particleMaterial);
     DECLARE_INSTANCE_FIELD(UnityEngine::Texture2D*, ownedTexture);
@@ -197,6 +198,21 @@ namespace {
         return texture;
     }
 
+    Color32 CrystalReflection(const Particle& particle, const Vector3& eye, float angle) {
+        const float dx = eye.x - particle.position.x;
+        const float dy = eye.y - particle.position.y;
+        const float dz = eye.z - particle.position.z;
+        const float distance = std::max(0.001f, std::sqrt(dx * dx + dy * dy + dz * dz));
+        const float phase = particle.phase + angle + (3.1f * dx + 1.7f * dy + 2.2f * dz) / distance;
+        const auto channel = [phase](float offset) {
+            // Pale spectral highlights leave the original white ice detail readable.
+            return static_cast<uint8_t>(255.0f * (0.84f + 0.16f * std::cos(phase + offset)));
+        };
+        Color32 color;
+        color._ctor(channel(0.0f), channel(fullTurn / 3.0f), channel(2.0f * fullTurn / 3.0f), 255);
+        return color;
+    }
+
     void Advance(Particle& particle, const MenuParticlePattern& pattern, float dt, float wind, float contactY) {
         const float age = pattern.lifetime - particle.remaining;
         particle.remaining -= dt;
@@ -301,6 +317,7 @@ UnityEngine::GameObject* Seasonal::CreateMenuParticles(const char* name, const M
     }
 
     controller->vertexBuffer = positions.operator->();
+    if (pattern.useNativeDustRenderer) controller->crystalColorBuffer = colors.operator->();
     controller->particleMesh->SetVertices(positions);
     controller->particleMesh->SetUVs(0, uvs);
     controller->particleMesh->set_colors32(colors);
@@ -347,8 +364,8 @@ void Seasonal::MenuParticleController::LateUpdate() {
     const bool useNativeRenderer = !emitter.nativeBatches.empty();
     for (auto& batch : emitter.nativeBatches) batch.clear();
     ArrayW<Vector3> positions(vertexBuffer);
-    Color32 white;
-    if (useNativeRenderer) white._ctor(255, 255, 255, 255);
+    ArrayW<Color32> crystalColors(crystalColorBuffer);
+    const Vector3 eye = pattern.useNativeDustRenderer && view ? view->get_position() : Vector3(0, 1.6f, 0);
     for (int i = 0; i < pattern.capacity; ++i) {
         auto& particle = emitter.particles[i];
         const int vertex = i * 4;
@@ -381,10 +398,14 @@ void Seasonal::MenuParticleController::LateUpdate() {
                     flake.set_startSize(particle.size);
                     flake.set_startLifetime(pattern.lifetime);
                     flake.set_remainingLifetime(particle.remaining);
-                    flake.set_startColor(white);
+                    flake.set_startColor(CrystalReflection(particle, eye, displayedAngle));
                     flake.set_randomSeed(static_cast<uint32_t>(i + 1));
                     flake.set_rotation3D(Vector3(0.0f, 0.0f, displayedAngle * (360.0f / fullTurn)));
                     continue;
+                }
+                if (crystalColorBuffer) {
+                    const auto tint = CrystalReflection(particle, eye, displayedAngle);
+                    for (int j = 0; j < 4; ++j) crystalColors[vertex + j] = tint;
                 }
                 positions[vertex] = Vector3(center.x - horizontal.x - vertical.x,
                                             center.y - horizontal.y - vertical.y,
@@ -414,6 +435,7 @@ void Seasonal::MenuParticleController::LateUpdate() {
         return;
     }
 
+    if (crystalColorBuffer) particleMesh->set_colors32(crystalColors);
     particleMesh->SetVertices(positions, 0, pattern.capacity * 4,
                                Rendering::MeshUpdateFlags::DontRecalculateBounds);
 }
