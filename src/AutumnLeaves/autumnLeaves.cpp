@@ -1,3 +1,4 @@
+#include "UnityEngine/ParticleSystem_MinMaxCurve.hpp"
 #include "beatsaber-hook/shared/safeptr.hpp"
 #include "AutumnLeaves/autumnLeaves.hpp"
 
@@ -59,7 +60,7 @@ namespace Seasonal::autumnLeaves {
         autumnLeavesGo->transform->rotation = UnityEngine::Quaternion::Euler(UnityEngine::Vector3(0.0f, 0.0f, 0.0f));
 
         // Use Flair's ParticleController to modify ParticleSystem properties to warp the dust into autumnLeaves
-        ParticleController::MainModule::set_startLifetime(autumnLeaves, 14.0f);
+        autumnLeaves->main.set_startLifetime(UnityEngine::ParticleSystem_MinMaxCurve::op_Implicit___UnityEngine__ParticleSystem_MinMaxCurve(14.0f));
         ParticleController::MainModule::set_startSize(autumnLeaves, 0.18);
         ParticleController::MainModule::set_maxParticles(autumnLeaves, 150);
         ParticleController::MainModule::set_gravityModifier(autumnLeaves, 0.025f);
@@ -85,8 +86,8 @@ ParticleController::ColorBySpeedModule::set_enabled(
     autumnLeaves,
     false
 );
-        ParticleController::EmissionModule::set_enabled(autumnLeaves, true); // ParticleTuner compatibility
-        ParticleController::EmissionModule::set_rateOverTime(autumnLeaves, 5);
+        autumnLeaves->emission.set_enabled(true); // ParticleTuner compatibility
+        autumnLeaves->emission.set_rateOverTime(UnityEngine::ParticleSystem_MinMaxCurve::op_Implicit___UnityEngine__ParticleSystem_MinMaxCurve(5));
         ParticleController::ShapeModule::set_shapeType(autumnLeaves, ParticleController::ShapeType::Box);
         ParticleController::ShapeModule::set_position(autumnLeaves, UnityEngine::Vector3(0.0f, 0.0f, 0.0f));
         ParticleController::ShapeModule::set_rotation(autumnLeaves, UnityEngine::Vector3(0.0f, 0.0f, 0.0f));

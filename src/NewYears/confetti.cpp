@@ -1,3 +1,4 @@
+#include "UnityEngine/ParticleSystem_MinMaxCurve.hpp"
 #include "beatsaber-hook/shared/safeptr.hpp"
 #include "NewYears/newYears.hpp"
 #include "AutumnLeaves/particleController.hpp"
@@ -44,7 +45,7 @@ void CreateConfetti() {
     auto* renderer = confettiGo->GetComponent<ParticleSystemRenderer*>();
     if (!particles || !renderer) { DestroyConfetti(); return; }
 
-    ParticleController::MainModule::set_startLifetime(particles, 16.0f);
+    particles->main.set_startLifetime(ParticleSystem_MinMaxCurve::op_Implicit___UnityEngine__ParticleSystem_MinMaxCurve(16.0f));
     ParticleController::MainModule::set_startSize(particles,
         ParticleController::MinMaxCurve(0.045f, 0.12f));
     ParticleController::MainModule::set_startRotation(particles,
@@ -62,8 +63,8 @@ void CreateConfetti() {
     ParticleController::MainModule::set_startColor(particles, white);
     ParticleController::ColorOverLifetimeModule::set_enabled(particles, false);
     ParticleController::ColorBySpeedModule::set_enabled(particles, false);
-    ParticleController::EmissionModule::set_enabled(particles, true);
-    ParticleController::EmissionModule::set_rateOverTime(particles, 16.0f);
+    particles->emission.set_enabled(true);
+    particles->emission.set_rateOverTime(ParticleSystem_MinMaxCurve::op_Implicit___UnityEngine__ParticleSystem_MinMaxCurve(16.0f));
     ParticleController::ShapeModule::set_shapeType(particles, ParticleController::ShapeType::Box);
     ParticleController::ShapeModule::set_position(particles, Vector3(0, 0, 0));
     ParticleController::ShapeModule::set_rotation(particles, Vector3(0, 0, 0));

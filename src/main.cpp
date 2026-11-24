@@ -88,31 +88,8 @@ namespace {
 
 }
 
-// Unity copies this block into the renderer. Restore the caller's value after
-// submission in case the same block is reused for other environment meshes.
-MAKE_HOOK_MATCH(MenuFloorSetPropertyBlock,
-    static_cast<void (Renderer::*)(MaterialPropertyBlock*)>(&Renderer::SetPropertyBlock),
-    void, Renderer* self, MaterialPropertyBlock* block) {
-    if (block && hasMenuFloorBaseline && menuFloor &&
-        self == static_cast<Renderer*>(menuFloor.ptr()) && currentTheme != Theme::Default) {
-        static const int colorProperty = Shader::PropertyToID("_Color");
-        const auto incoming = block->GetColor(colorProperty);
-        // Ignore neutral and unset overrides, including the guard's own writes.
-        if (incoming.r != incoming.g || incoming.g != incoming.b) {
-            block->SetColor(colorProperty, menuFloorBaseline);
-            MenuFloorSetPropertyBlock(self, block);
-            block->SetColor(colorProperty, incoming);
-            if (!loggedFloorRestore) {
-                loggedFloorRestore = true;
-                PaperLogger.info("[MenuFloorRestoration] intercepted BasicMenuGround _Color before submission RGBA=({},{},{},{})",
-                     incoming.r, incoming.g, incoming.b, incoming.a);
-            }
-            return;
-        }
-    }
-    MenuFloorSetPropertyBlock(self, block);
-}
-
+// Unity 6 routes SetPropertyBlock through a thunk too small for an inline hook.
+// Correct the menu renderer in LateUpdate after gameplay.
 DECLARE_CLASS_CODEGEN(SeasonalThemes, FloorRendererSample, UnityEngine::MonoBehaviour) {
     DECLARE_INSTANCE_FIELD(float, nextLookupAt);
     DECLARE_INSTANCE_FIELD(UnityEngine::MaterialPropertyBlock*, propertyBlock);
@@ -561,7 +538,7 @@ static void RefreshLights() {
     // output as a new source color in the hook.
     for (const auto& light : menuLights) {
         if (light.manager)
-            Hook_SeasonalMenuLighting::SeasonalMenuLighting(light.manager, light.id, ApplyTheme(light.original, light.id));
+            hook_SeasonalMenuLighting::SeasonalMenuLighting(light.manager, light.id, ApplyTheme(light.original, light.id));
     }
 }
 
@@ -650,7 +627,6 @@ extern "C" __attribute__((visibility("default"))) void late_load() noexcept {
     LoadTheme();
     INSTALL_HOOK(PaperLogger, SeasonalMenuDidActivate);
     INSTALL_HOOK(PaperLogger, SeasonalMenuLighting);
-    INSTALL_HOOK(PaperLogger, MenuFloorSetPropertyBlock);
     INSTALL_HOOK(PaperLogger, SeasonalResultsOpen);
     INSTALL_HOOK(PaperLogger, SeasonalResultsClose);
     INSTALL_HOOK(PaperLogger, SeasonalSongPlayerEnable);

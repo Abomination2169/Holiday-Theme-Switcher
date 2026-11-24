@@ -1,3 +1,4 @@
+#include "UnityEngine/ParticleSystem_MinMaxCurve.hpp"
 #include "beatsaber-hook/shared/safeptr.hpp"
 #include "ChristmasEve/snow.hpp"
 #include "assets.hpp"
@@ -88,14 +89,14 @@ namespace ChristmasEve::snowflakes {
             auto* ps = root->GetComponent<ParticleSystem*>();
             if (!ps) { GameObject::Destroy(root); return nullptr; }
 
-            ParticleController::MainModule::set_startLifetime(ps, lifetime);
+            ps->main.set_startLifetime(ParticleSystem_MinMaxCurve::op_Implicit___UnityEngine__ParticleSystem_MinMaxCurve(lifetime));
             ParticleController::MainModule::set_startSize(ps, size);
-            ParticleController::MainModule::set_startSpeed(ps, 0.0f);
+            ps->main.set_startSpeedMultiplier(0.0f);
             ParticleController::MainModule::set_maxParticles(ps, limit);
             ParticleController::MainModule::set_simulationSpace(ps, ParticleController::SimulationSpace::World);
-            ParticleController::MainModule::set_gravityModifier(ps, gravity);
-            ParticleController::EmissionModule::set_enabled(ps, true);
-            ParticleController::EmissionModule::set_rateOverTime(ps, rate);
+            ps->main.set_gravityModifierMultiplier(gravity);
+            ps->emission.set_enabled(true);
+            ps->emission.set_rateOverTime(ParticleSystem_MinMaxCurve::op_Implicit___UnityEngine__ParticleSystem_MinMaxCurve(rate));
             ParticleController::ShapeModule::set_shapeType(ps, ParticleController::ShapeType::Box);
             ParticleController::ShapeModule::set_position(ps, Vector3(0.0f, 0.0f, 0.0f));
             ParticleController::ShapeModule::set_rotation(ps, Vector3(0.0f, 0.0f, 0.0f));

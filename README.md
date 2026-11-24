@@ -25,6 +25,10 @@ Switch between seasonal Beat Saber menu environments instantly, or let the calen
 
 Manual selections stay selected until changed. A saved original Christmas selection opens Christmas Eve. Dynamic mode rechecks the calendar while outside gameplay.
 
+## 1.45.3 test notes
+
+Unity 6 may skip unavailable legacy particle settings. Check snowfall, autumn leaves, and confetti on Quest, especially when switching themes. Menu floor color restoration runs in `LateUpdate` on this branch. Check the floor after returning from a map with custom lighting.
+
 ## Installation and use
 
 1. Download the **experimental 1.45.3 QMOD** from this branch’s successful GitHub Actions build.

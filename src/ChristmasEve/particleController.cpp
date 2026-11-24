@@ -6,64 +6,64 @@
 // Define a setter and getter function for a property that directly returns the value
 #define DEFINE_FIELD_SETGET_DIRECT(moduleType, moduleName, propertyType, propertyName) \
 propertyType ChristmasEveFlair::ParticleController::moduleType::get_##propertyName(UnityEngine::ParticleSystem* particleSystem) { \
-    static auto GetterFunc = i2c::resolve_icall<propertyType, UnityEngine::ParticleSystem::moduleType*>("UnityEngine.ParticleSystem/" #moduleType "::get_" #propertyName "_Injected").value(); \
+    static auto GetterFunc = i2c::resolve_icall<propertyType, UnityEngine::ParticleSystem::moduleType*>("UnityEngine.ParticleSystem/" #moduleType "::get_" #propertyName "_Injected").value_or(nullptr); \
     UnityEngine::ParticleSystem::moduleType moduleObj = particleSystem->moduleName; \
-    return GetterFunc(&moduleObj); \
+    return GetterFunc ? GetterFunc(&moduleObj) : propertyType{}; \
 } \
 void ChristmasEveFlair::ParticleController::moduleType::set_##propertyName(UnityEngine::ParticleSystem* particleSystem, propertyType value) { \
-    static auto SetterFunc = i2c::resolve_icall<void, UnityEngine::ParticleSystem::moduleType*, propertyType>("UnityEngine.ParticleSystem/" #moduleType "::set_" #propertyName "_Injected").value(); \
+    static auto SetterFunc = i2c::resolve_icall<void, UnityEngine::ParticleSystem::moduleType*, propertyType>("UnityEngine.ParticleSystem/" #moduleType "::set_" #propertyName "_Injected").value_or(nullptr); \
     UnityEngine::ParticleSystem::moduleType moduleObj = particleSystem->moduleName; \
-    SetterFunc(&moduleObj, value); \
+    if (SetterFunc) SetterFunc(&moduleObj, value); \
 }
 
 // Define a setter and getter function for a property that will only return the value by passing in a reference
 #define DEFINE_FIELD_SETGET_BY_REF(moduleType, moduleName, propertyType, propertyName) \
 propertyType ChristmasEveFlair::ParticleController::moduleType::get_##propertyName(UnityEngine::ParticleSystem *particleSystem) { \
-    static auto GetterFunc = i2c::resolve_icall<void, UnityEngine::ParticleSystem::moduleType*, propertyType*>("UnityEngine.ParticleSystem/" #moduleType "::get_" #propertyName "_Injected").value(); \
+    static auto GetterFunc = i2c::resolve_icall<void, UnityEngine::ParticleSystem::moduleType*, propertyType*>("UnityEngine.ParticleSystem/" #moduleType "::get_" #propertyName "_Injected").value_or(nullptr); \
     UnityEngine::ParticleSystem::moduleType moduleObj = particleSystem->moduleName; \
-    propertyType propertyObj; \
-    GetterFunc(&moduleObj, &propertyObj); \
+    propertyType propertyObj{}; \
+    if (GetterFunc) GetterFunc(&moduleObj, &propertyObj); \
     return propertyObj; \
 } \
 void ChristmasEveFlair::ParticleController::moduleType::set_##propertyName(UnityEngine::ParticleSystem *particleSystem, propertyType value) { \
-    static auto SetterFunc = i2c::resolve_icall<void, UnityEngine::ParticleSystem::moduleType*, propertyType*>("UnityEngine.ParticleSystem/" #moduleType "::set_" #propertyName "_Injected").value(); \
+    static auto SetterFunc = i2c::resolve_icall<void, UnityEngine::ParticleSystem::moduleType*, propertyType*>("UnityEngine.ParticleSystem/" #moduleType "::set_" #propertyName "_Injected").value_or(nullptr); \
     UnityEngine::ParticleSystem::moduleType moduleObj = particleSystem->moduleName; \
-    SetterFunc(&moduleObj, &value); \
+    if (SetterFunc) SetterFunc(&moduleObj, &value); \
 }
 
 #define DEFINE_VOID_1(moduleType, moduleName, funcName, para1Type, para1Name) \
 void ChristmasEveFlair::ParticleController::moduleType::funcName(UnityEngine::ParticleSystem* particleSystem, para1Type para1Name) { \
-    static auto Func = i2c::resolve_icall<void, UnityEngine::ParticleSystem::moduleType*, para1Type>("UnityEngine.ParticleSystem/" #moduleType "::" #funcName "_Injected").value(); \
+    static auto Func = i2c::resolve_icall<void, UnityEngine::ParticleSystem::moduleType*, para1Type>("UnityEngine.ParticleSystem/" #moduleType "::" #funcName "_Injected").value_or(nullptr); \
     UnityEngine::ParticleSystem::moduleType moduleObj = particleSystem->moduleName; \
-    Func(&moduleObj, para1Name); \
+    if (Func) Func(&moduleObj, para1Name); \
 }
 
 #define DEFINE_VOID_2(moduleType, moduleName, funcName, para1Type, para1Name, para2Type, para2Name) \
 void ChristmasEveFlair::ParticleController::moduleType::funcName(UnityEngine::ParticleSystem* particleSystem, para1Type para1Name, para2Type para2Name) { \
-    static auto Func = i2c::resolve_icall<void, UnityEngine::ParticleSystem::moduleType*, para1Type, para2Type>("UnityEngine.ParticleSystem/" #moduleType "::" #funcName "_Injected").value(); \
+    static auto Func = i2c::resolve_icall<void, UnityEngine::ParticleSystem::moduleType*, para1Type, para2Type>("UnityEngine.ParticleSystem/" #moduleType "::" #funcName "_Injected").value_or(nullptr); \
     UnityEngine::ParticleSystem::moduleType moduleObj = particleSystem->moduleName; \
-    Func(&moduleObj, para1Name, para2Name); \
+    if (Func) Func(&moduleObj, para1Name, para2Name); \
 }
 
 #define DEFINE_VOID_4(moduleType, moduleName, funcName, para1Type, para1Name, para2Type, para2Name, para3Type, para3Name, para4Type, para4Name) \
 void ChristmasEveFlair::ParticleController::moduleType::funcName(UnityEngine::ParticleSystem* particleSystem, para1Type para1Name, para2Type para2Name, para3Type para3Name, para4Type para4Name) { \
-    static auto Func = i2c::resolve_icall<void, UnityEngine::ParticleSystem::moduleType*, para1Type, para2Type, para3Type, para4Type>("UnityEngine.ParticleSystem/" #moduleType "::" #funcName "_Injected").value(); \
+    static auto Func = i2c::resolve_icall<void, UnityEngine::ParticleSystem::moduleType*, para1Type, para2Type, para3Type, para4Type>("UnityEngine.ParticleSystem/" #moduleType "::" #funcName "_Injected").value_or(nullptr); \
     UnityEngine::ParticleSystem::moduleType moduleObj = particleSystem->moduleName; \
-    Func(&moduleObj, para1Name, para2Name, para3Name, para4Name); \
+    if (Func) Func(&moduleObj, para1Name, para2Name, para3Name, para4Name); \
 }
 
 #define DEFINE_RETURN_0(returnType, moduleType, moduleName, funcName) \
 returnType ChristmasEveFlair::ParticleController::moduleType::funcName(UnityEngine::ParticleSystem* particleSystem) { \
-    static auto Func = i2c::resolve_icall<returnType, UnityEngine::ParticleSystem::moduleType*>("UnityEngine.ParticleSystem/" #moduleType "::" #funcName "_Injected").value(); \
+    static auto Func = i2c::resolve_icall<returnType, UnityEngine::ParticleSystem::moduleType*>("UnityEngine.ParticleSystem/" #moduleType "::" #funcName "_Injected").value_or(nullptr); \
     UnityEngine::ParticleSystem::moduleType moduleObj = particleSystem->moduleName; \
-    return Func(&moduleObj); \
+    return Func ? Func(&moduleObj) : returnType{}; \
 }
 
 #define DEFINE_RETURN_1(returnType, moduleType, moduleName, funcName, para1Type, para1Name) \
 returnType ChristmasEveFlair::ParticleController::moduleType::funcName(UnityEngine::ParticleSystem* particleSystem, para1Type para1Name) { \
-    static auto Func = i2c::resolve_icall<returnType, UnityEngine::ParticleSystem::moduleType*, para1Type>("UnityEngine.ParticleSystem/" #moduleType "::" #funcName "_Injected").value(); \
+    static auto Func = i2c::resolve_icall<returnType, UnityEngine::ParticleSystem::moduleType*, para1Type>("UnityEngine.ParticleSystem/" #moduleType "::" #funcName "_Injected").value_or(nullptr); \
     UnityEngine::ParticleSystem::moduleType moduleObj = particleSystem->moduleName; \
-    return Func(&moduleObj, para1Name); \
+    return Func ? Func(&moduleObj, para1Name) : returnType{}; \
 }
 
 
@@ -119,16 +119,16 @@ DEFINE_FIELD_SETGET_DIRECT(EmissionModule, emission, float, rateOverTimeMultipli
 DEFINE_FIELD_SETGET_BY_REF(EmissionModule, emission, ChristmasEveFlair::ParticleController::MinMaxCurve, rateOverDistance);
 DEFINE_FIELD_SETGET_DIRECT(EmissionModule, emission, float, rateOverDistanceMultiplier);
 ChristmasEveFlair::ParticleController::Burst ChristmasEveFlair::ParticleController::EmissionModule::GetBurst(UnityEngine::ParticleSystem* particleSystem, int index) {
-    static auto Func = i2c::resolve_icall<void, UnityEngine::ParticleSystem::EmissionModule*, int, ChristmasEveFlair::ParticleController::Burst*>("UnityEngine.ParticleSystem/EmissionModule::GetBurst_Injected").value();
+    static auto Func = i2c::resolve_icall<void, UnityEngine::ParticleSystem::EmissionModule*, int, ChristmasEveFlair::ParticleController::Burst*>("UnityEngine.ParticleSystem/EmissionModule::GetBurst_Injected").value_or(nullptr);
     UnityEngine::ParticleSystem::EmissionModule moduleObj = particleSystem->emission;
-    ChristmasEveFlair::ParticleController::Burst propertyObj;
-    Func(&moduleObj, index, &propertyObj);
+    ChristmasEveFlair::ParticleController::Burst propertyObj{};
+    if (Func) Func(&moduleObj, index, &propertyObj);
     return propertyObj;
 }
 void ChristmasEveFlair::ParticleController::EmissionModule::SetBurst(UnityEngine::ParticleSystem* particleSystem, int index, ChristmasEveFlair::ParticleController::Burst burst) {
-    static auto Func = i2c::resolve_icall<void, UnityEngine::ParticleSystem::EmissionModule*, int, ChristmasEveFlair::ParticleController::Burst*>("UnityEngine.ParticleSystem/EmissionModule::SetBurst_Injected").value();
+    static auto Func = i2c::resolve_icall<void, UnityEngine::ParticleSystem::EmissionModule*, int, ChristmasEveFlair::ParticleController::Burst*>("UnityEngine.ParticleSystem/EmissionModule::SetBurst_Injected").value_or(nullptr);
     UnityEngine::ParticleSystem::EmissionModule moduleObj = particleSystem->emission;
-    Func(&moduleObj, index, &burst);
+    if (Func) Func(&moduleObj, index, &burst);
 }
 DEFINE_FIELD_SETGET_DIRECT(EmissionModule, emission, int, burstCount);
 
