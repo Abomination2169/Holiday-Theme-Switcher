@@ -4,7 +4,11 @@
 
 Switch between seasonal Beat Saber menu environments instantly, or let the calendar select a theme automatically.
 
-**Compatibility:** Meta Quest 3 · Beat Saber **1.40.8_7379** · Quest QMOD `seasonalthemes` · **v1.0.0**
+Based on the fantastic Christmas Mod by Vcmikuu and CatsaCode.
+
+Note: Development assisted with use of A.I. Please support talented artists and coders whenever possible.
+
+**Compatible with:** Beat Saber 1.40.8 (Quest)
 
 ## Themes
 
