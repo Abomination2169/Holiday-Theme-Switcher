@@ -16,12 +16,13 @@
 #include "UnityEngine/Object.hpp"
 #include "UnityEngine/SceneManagement/SceneManager.hpp"
 #include "System/Threading/Tasks/Tasks.hpp"
-#include "custom-types/shared/delegate.hpp"
+#include "beatsaber-hook/shared/safeptr.hpp"
 #include "custom-types/shared/macros.hpp"
 #include <array>
 #include <algorithm>
 #include <cmath>
-#include <functional>
+#include <filesystem>
+#include <utility>
 #include <string>
 
 DECLARE_CLASS_CODEGEN(ChristmasEve, AuroraCurtainController, UnityEngine::MonoBehaviour) {
@@ -31,15 +32,14 @@ DEFINE_TYPE(ChristmasEve, AuroraCurtainController);
 
 namespace ChristmasEve::aurora {
     namespace {
-        UnityEngine::GameObject* root = nullptr;
-        std::array<UnityEngine::UI::Image*, 3> bands{};
-        UnityEngine::AudioSource* soundSource = nullptr;
-        UnityEngine::AudioClip* soundClip = nullptr;
-        bool soundLoading = false;
-        bool playPending = false;
+        using BellTask = decltype(std::declval<GlobalNamespace::MediaAsyncLoader*>()
+            ->LoadAudioClipFromFilePathAsync(std::string{}));
+
+        safe_ptr<UnityEngine::GameObject*, true> root;
+        std::array<safe_ptr<UnityEngine::UI::Image*, true>, 3> bands{};
+        safe_ptr<UnityEngine::AudioSource*, true> soundSource;
+        safe_ptr<BellTask, false> bellTask;
         bool anchoredToLogo = false;
-        unsigned int appearanceId = 0;
-        unsigned int loadedForAppearance = 0;
         bool showing = false;
         bool previewing = false;
         float previewSeconds = 0.0f;
@@ -49,61 +49,39 @@ namespace ChristmasEve::aurora {
         constexpr const char* jinglePath =
             "/sdcard/ModData/com.beatgames.beatsaber/Mods/SeasonalThemes/christmas-eve-aurora-jingle.ogg";
 
-        void PlayBellOnce(unsigned int requestedAppearance) {
-            if (!showing || requestedAppearance != appearanceId) {
-                INFO("[Aurora78] Stale bell request ignored id={} current={}", requestedAppearance, appearanceId);
-                return;
-            }
-            if (soundSource && soundClip && loadedForAppearance == requestedAppearance) {
-                soundSource->Stop();
-                soundSource->set_loop(false);
-                soundSource->set_clip(soundClip);
-                soundSource->set_time(0.0f);
-                soundSource->Play();
-                playPending = false;
-                INFO("[Aurora78] Bell PLAY id={} isPlaying={} volume={} loop=false",
-                     requestedAppearance, soundSource->get_isPlaying(), soundSource->get_volume());
-            } else {
-                playPending = true;
-                INFO("[Aurora78] Bell awaiting fresh clip id={} clip={} source={} loadedId={}",
-                     requestedAppearance, soundClip != nullptr, soundSource != nullptr,
-                     loadedForAppearance);
-            }
+        void LoadBell() {
+            std::error_code error;
+            if (!soundSource || !std::filesystem::exists(jinglePath, error)) return;
+            auto* loader = GlobalNamespace::MediaAsyncLoader::New_ctor();
+            if (loader) bellTask = loader->LoadAudioClipFromFilePathAsync(std::string(jinglePath));
         }
 
-        void LoadBell(unsigned int requestedAppearance) {
-            // A scene transition can invalidate audio loaded for the menu.
-            // Load a fresh clip for every aurora appearance, including results.
-            soundLoading = true;
-            auto* loader = GlobalNamespace::MediaAsyncLoader::New_ctor();
-            if (!loader) { soundLoading = false; INFO("[Aurora78] ERROR: Media loader unavailable"); return; }
-            auto* task = loader->LoadAudioClipFromFilePathAsync(jinglePath);
-            if (!task) { soundLoading = false; INFO("[Aurora78] ERROR: Bell load task unavailable"); return; }
-            INFO("[Aurora78] Bell load requested for appearance {}", requestedAppearance);
-            task->GetAwaiter().OnCompleted(custom_types::MakeDelegate<System::Action*>(
-                std::function([task, requestedAppearance]() {
-                    if (requestedAppearance != appearanceId) {
-                        INFO("[Aurora78] Ignoring old audio load id={} current={}",
-                             requestedAppearance, appearanceId);
-                        return;
-                    }
-                    soundLoading = false;
-                    if (task->get_IsFaulted() || task->get_IsCanceled()) {
-                        playPending = false;
-                        INFO("[Aurora78] ERROR: Bell load faulted/cancelled id={}", requestedAppearance);
-                        return;
-                    }
-                    soundClip = task->get_Result();
-                    loadedForAppearance = requestedAppearance;
-                    INFO("[Aurora78] Bell clip fresh-loaded id={} valid={}",
-                         requestedAppearance, soundClip != nullptr);
-                    if (playPending && showing) PlayBellOnce(requestedAppearance);
-                })
-            ));
+        void PlayLoadedBell() {
+            if (!bellTask || !bellTask->get_IsCompleted()) return;
+            if (showing && soundSource && !bellTask->get_IsFaulted() && !bellTask->get_IsCanceled()) {
+                auto clip = bellTask->get_Result();
+                if (clip) {
+                    soundSource->set_clip(clip);
+                    soundSource->Play();
+                }
+            }
+            bellTask = nullptr;
+        }
+
+        void StopBell() {
+            bellTask = nullptr;
+            if (soundSource) soundSource->Stop();
         }
 
         bool Create() {
-            if (root) return true;
+            if (root && std::all_of(bands.begin(), bands.end(), [](const auto& band) {
+                return static_cast<bool>(band);
+            })) return true;
+            if (root) UnityEngine::Object::Destroy(root.ptr());
+            root = nullptr;
+            soundSource = nullptr;
+            for (auto& band : bands) band = nullptr;
+            anchoredToLogo = false;
             auto sprite = BSML::Utilities::LoadSpriteRaw(
                 static_cast<ArrayW<uint8_t>>(IncludedAssets::christmas_eve_aurora_v77_png));
             if (!sprite) {
@@ -112,11 +90,11 @@ namespace ChristmasEve::aurora {
             }
             root = UnityEngine::GameObject::New_ctor("ChristmasEveAurora77");
             if (!root) return false;
-            UnityEngine::Object::DontDestroyOnLoad(root);
+            UnityEngine::Object::DontDestroyOnLoad(root.ptr());
             auto* canvas = BSML::Lite::CreateCanvas();
             if (!canvas || !canvas->transform) {
                 INFO("[Aurora77] ERROR: BSML aurora canvas unavailable");
-                UnityEngine::Object::Destroy(root);
+                UnityEngine::Object::Destroy(root.ptr());
                 root = nullptr;
                 return false;
             }
@@ -132,7 +110,7 @@ namespace ChristmasEve::aurora {
                     UnityEngine::Vector2(1469.0f, 341.0f));
                 if (!bands[k]) {
                     INFO("[Aurora77] ERROR: CreateImage failed for band {}", k);
-                    UnityEngine::Object::Destroy(root);
+                    UnityEngine::Object::Destroy(root.ptr());
                     root = nullptr;
                     return false;
                 }
@@ -197,24 +175,16 @@ namespace ChristmasEve::aurora {
                 INFO("[Aurora77] ERROR: requested aurora, but Create failed");
                 return;
             }
-            ++appearanceId;
+            StopBell();
             previewing = isPreview;
             previewSeconds = isPreview ? 18.0f : 0.0f;
             showing = true;
             phase = 0.0f;
             opacity = 0.0f;
-            root->SetActive(true);
             if (isPreview) PositionAboveLogo(); else PositionForResults();
-            // Every menu/results appearance requests a distinct, uncached OGG playback.
-            soundClip = nullptr;
-            loadedForAppearance = 0;
-            playPending = true;
-            if (soundSource) soundSource->Stop();
-            LoadBell(appearanceId);
-            PlayBellOnce(appearanceId);
-            INFO("[Aurora78] START id={} mode={} rootActive={} bands={} previewSeconds={}",
-                appearanceId, isPreview ? "menu" : "results", root->get_activeInHierarchy(),
-                bands.size(), previewSeconds);
+            root->SetActive(true);
+            LoadBell();
+            INFO("[Aurora] Started {} animation", isPreview ? "menu" : "results");
         }
     }
 
@@ -222,18 +192,17 @@ namespace ChristmasEve::aurora {
     void EndResults(bool immediately) {
         showing = false;
         previewing = false;
-        playPending = false;
-        if (soundSource) soundSource->Stop();
+        StopBell();
         if (immediately) {
             opacity = 0.0f;
             if (root) root->SetActive(false);
         }
-        INFO("[Aurora78] Results deactivated id={} immediate={}", appearanceId, immediately);
+        INFO("[Aurora] Results deactivated immediate={}", immediately);
     }
     void PreviewMenu() {
         // Cache the live menu logo pose silently for later results screens.
         // The persistent root is not displayed and no audio is requested here.
-        if (anchoredToLogo) return;
+        if (anchoredToLogo && root) return;
         if (!UnityEngine::GameObject::Find("ChristmasSolidE") &&
             !UnityEngine::GameObject::Find("EFlickering")) return;
         if (!Create()) return;
@@ -245,14 +214,14 @@ namespace ChristmasEve::aurora {
     }
     void Tick() {
         if (!root) return;
+        PlayLoadedBell();
         const float dt = UnityEngine::Time::get_deltaTime();
         phase += dt;
         if (previewing) {
             if (UnityEngine::SceneManagement::SceneManager::GetActiveScene().name == "GameCore") {
                 previewing = false;
                 showing = false;
-                playPending = false;
-                if (soundSource) soundSource->Stop();
+                StopBell();
                 opacity = 0.0f;
                 root->SetActive(false);
                 INFO("[Aurora77] Preview stopped for gameplay");
@@ -311,8 +280,7 @@ namespace ChristmasEve::aurora {
         if (!showing && opacity < 0.006f) {
             opacity = 0.0f;
             root->SetActive(false);
-            playPending = false;
-            if (soundSource) soundSource->Stop();
+            StopBell();
             INFO("[Aurora77] Render root disabled after fade");
         }
     }
