@@ -1,0 +1,17 @@
+/build/
+/extern/
+/shared/
+/mod.json
+/SeasonalThemes.qmod
+/ndkpath.txt
+*.so
+*.o
+
+/assets/solid_e_red.png
+/assets/christmas_candy_cane_v63.png
+/assets/christmas_eve_aurora_v77.png
+/assets/christmas_tree_presents_v66.png
+/assets/garland_christmas.png
+/assets/garland_sparkle.png
+/assets/ghost_new_*.png
+/assets/christmas_eve_snowflakes.png
