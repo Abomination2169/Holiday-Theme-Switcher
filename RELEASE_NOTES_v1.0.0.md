@@ -1,6 +1,6 @@
 # Holiday Theme Switcher v1.0.0
 
-For Meta Quest and Beat Saber `1.40.8_7379`.
+For Meta Quest and Beat Saber `1.45.3_30054`.
 
 - Choose Default, Halloween, Thanksgiving, Christmas Eve, New Years, or Dynamic.
 - Christmas Eve replaces the original Christmas theme. It includes layered snowfall, snowdrifts, a mountain backdrop, and the results-screen aurora.

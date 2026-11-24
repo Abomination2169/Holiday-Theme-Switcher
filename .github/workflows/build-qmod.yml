@@ -1,7 +1,7 @@
 name: Build Holiday Theme Switcher Quest QMOD
 on:
   push:
-    branches: [experimental/beat-saber-1.45.3]
+    branches: [release/beat-saber-1.45.3]
   workflow_dispatch:
 permissions:
   contents: read
@@ -78,7 +78,7 @@ jobs:
               assert manifest['packageVersion']=='1.45.3_30054'
               assert 'Ghostly_Horror_Menu.ogg' in names
               assert 'Thanksgiving-Gobble-Quiet-Phrase.ogg' in names
-              assert manifest['version']=='1.0.0-1453-dev.1'
+              assert manifest['version']=='1.0.0'
               assert 'christmas-eve-aurora-jingle.ogg' in names
               assert 'dance_of_the_sugar_plum_fairy.ogg' in names
               assert not names.intersection({'carolofthebells.ogg', 'christmasspirit.ogg', 'deckthehalls.ogg', 'jinglebells.ogg'})
@@ -86,6 +86,6 @@ jobs:
           PY
       - uses: actions/upload-artifact@v4
         with:
-          name: Holiday-Theme-Switcher-1.45.3-Experimental-QMOD
+          name: Holiday-Theme-Switcher-1.45.3-QMOD
           path: SeasonalThemes.qmod
           if-no-files-found: error

@@ -4,7 +4,7 @@
   "name": "Holiday Theme Switcher",
   "id": "seasonalthemes",
   "author": "Abomination2169",
-  "version": "1.0.0-1453-dev.1",
+  "version": "1.0.0",
   "packageId": "com.beatgames.beatsaber",
   "packageVersion": "1.45.3_30054",
   "description": "Automatically switch between holiday-themed Beat Saber environments, or choose your favorite manually.",
