@@ -10,13 +10,13 @@
 #include "ChristmasEve/snow.hpp"
 #include "GlobalNamespace/ResultsViewController.hpp"
 #include "GlobalNamespace/LevelCompletionResults.hpp"
+#include "GlobalNamespace/FireworkItemController.hpp"
+#include "GlobalNamespace/RankModel.hpp"
 #include "GlobalNamespace/MediaAsyncLoader.hpp"
 #include "UnityEngine/AudioSource.hpp"
 #include "UnityEngine/AudioClip.hpp"
 #include "System/Threading/Tasks/Tasks.hpp"
-#include "custom-types/shared/delegate.hpp"
 #include <filesystem>
-#include <functional>
 #include "NewYears/newYears.hpp"
 #include "GlobalNamespace/SongPreviewPlayer.hpp"
 #include "GlobalNamespace/LightWithIdManager.hpp"
@@ -233,10 +233,14 @@ static void RestoreSelectedSnow() {
     }
 }
 
-namespace { void StopCelebration(); }
+namespace {
+    void StopCelebration();
+    void RestoreResultsFireworks();
+}
 
 static void ClearThemeDecor() {
     if (lastDecorTheme != currentTheme) {
+        RestoreResultsFireworks();
         Seasonal::autumnLeaves::DestroyAutumnLeaves();
         if (lastDecorTheme == Theme::Halloween) Halloween::ghostDrift::EndResultsScreen();
     }
@@ -542,16 +546,70 @@ static void RefreshLights() {
     }
 }
 
+DECLARE_CLASS_CODEGEN(SeasonalThemes, NewYearCelebrationAudio, UnityEngine::MonoBehaviour) {
+    DECLARE_INSTANCE_METHOD(void, Update);
+};
+DEFINE_TYPE(SeasonalThemes, NewYearCelebrationAudio);
+
 namespace {
+    struct SuppressedFirework {
+        safe_ptr<ParticleSystem*, true> particles;
+        bool emissionEnabled;
+    };
+    std::vector<SuppressedFirework> suppressedFireworks;
+    bool replaceResultsFireworks = false;
+    bool muteResultsFireworkLights = false;
+
+    void SuppressFirework(FireworkItemController* controller) {
+        if (!controller || !controller->get_gameObject()->get_activeInHierarchy()) return;
+        auto systems = controller->__cordl_internal_get__particleSystems();
+        if (!systems) return;
+        for (auto* entry : systems) {
+            if (!entry || !entry->_particleSystem) continue;
+            auto* particles = entry->_particleSystem.ptr();
+            auto emission = particles->emission;
+            if (std::none_of(suppressedFireworks.begin(), suppressedFireworks.end(), [particles](const auto& saved) {
+                return saved.particles && saved.particles.ptr() == particles;
+            })) {
+                suppressedFireworks.push_back({particles, emission.get_enabled()});
+            }
+            emission.set_enabled(false);
+            particles->Clear(false);
+        }
+    }
+
+    void ReplaceResultsFireworks(bool muteLights) {
+        replaceResultsFireworks = true;
+        muteResultsFireworkLights = muteLights;
+        for (auto* controller : Resources::FindObjectsOfTypeAll<FireworkItemController*>()) {
+            SuppressFirework(controller);
+            if (muteLights && controller && controller->get_gameObject()->get_activeInHierarchy()) {
+                controller->SetLightsColor(0.0f);
+            }
+        }
+    }
+
+    void RestoreResultsFireworks() {
+        replaceResultsFireworks = false;
+        muteResultsFireworkLights = false;
+        for (auto& saved : suppressedFireworks) {
+            if (saved.particles) saved.particles->emission.set_enabled(saved.emissionEnabled);
+        }
+        suppressedFireworks.clear();
+    }
+
+    using CelebrationTask = decltype(std::declval<MediaAsyncLoader*>()
+        ->LoadAudioClipFromFilePathAsync(std::string{}));
+    safe_ptr<CelebrationTask, false> celebrationTask;
     safe_ptr<GameObject*, true> celebrationHost;
     safe_ptr<AudioClip*, true> celebrationClip;
     bool celebrationActive = false;
     bool celebrationPlayed = false;
-    bool celebrationLoading = false;
     constexpr const char* celebrationPath = "/sdcard/ModData/com.beatgames.beatsaber/Mods/SeasonalThemes/new_year_celebration.ogg";
     void StopCelebration() {
         celebrationActive = false;
         celebrationPlayed = false;
+        celebrationTask = nullptr;
         if (celebrationHost) {
             auto* source = celebrationHost->GetComponent<AudioSource*>();
             if (source) source->Stop();
@@ -575,44 +633,76 @@ namespace {
         if (celebrationActive) return;
         celebrationActive = true;
         std::error_code ec;
-        if (!std::filesystem::exists(celebrationPath, ec)) return;
+        if (!std::filesystem::exists(celebrationPath, ec)) {
+            StopCelebration();
+            return;
+        }
         celebrationHost = GameObject::New_ctor("NewYearsCelebrationAudio");
+        if (!celebrationHost) { StopCelebration(); return; }
         auto* source = celebrationHost->AddComponent<AudioSource*>();
         if (!source) { StopCelebration(); return; }
         source->set_playOnAwake(false);
         if (celebrationClip) { PlayCelebration(); return; }
-        if (celebrationLoading) return;
-        celebrationLoading = true;
-        auto task = MediaAsyncLoader::New_ctor()->LoadAudioClipFromFilePathAsync(std::string(celebrationPath));
-        if (!task) { celebrationLoading = false; StopCelebration(); return; }
-        task->GetAwaiter().OnCompleted(custom_types::MakeDelegate<System::Action*>(
-            std::function([task]() {
-                celebrationLoading = false;
-                auto clip = task->get_Result();
-                if (!clip) return;
-                celebrationClip = clip.ptr();
-                PlayCelebration();
-            })));
+        auto* loader = MediaAsyncLoader::New_ctor();
+        if (!loader || !celebrationHost->AddComponent<SeasonalThemes::NewYearCelebrationAudio*>()) {
+            StopCelebration();
+            return;
+        }
+        celebrationTask = loader->LoadAudioClipFromFilePathAsync(std::string(celebrationPath));
+        if (!celebrationTask) StopCelebration();
     }
 }
+
+void SeasonalThemes::NewYearCelebrationAudio::Update() {
+    if (!celebrationHost || get_gameObject().ptr() != celebrationHost.ptr()) return;
+    if (!celebrationTask || !celebrationTask->get_IsCompleted()) return;
+    if (!celebrationTask->get_IsFaulted() && !celebrationTask->get_IsCanceled()) {
+        auto clip = celebrationTask->get_Result();
+        if (clip) celebrationClip = clip.ptr();
+    }
+    celebrationTask = nullptr;
+    PlayCelebration();
+}
+
+MAKE_HOOK_MATCH(SeasonalFireworkInit, &FireworkItemController::InitializeParticleSystem,
+    void, FireworkItemController* self) {
+    SeasonalFireworkInit(self);
+    if (replaceResultsFireworks) SuppressFirework(self);
+}
+
+MAKE_HOOK_MATCH(SeasonalFireworkSound, &FireworkItemController::PlayExplosionSound,
+    void, FireworkItemController* self) {
+    if (!replaceResultsFireworks) SeasonalFireworkSound(self);
+}
+
+MAKE_HOOK_MATCH(SeasonalFireworkLights, &FireworkItemController::SetLightsColor,
+    void, FireworkItemController* self, float intensity) {
+    SeasonalFireworkLights(self, muteResultsFireworkLights ? 0.0f : intensity);
+}
+
 MAKE_HOOK_MATCH(SeasonalResultsOpen, &ResultsViewController::DidActivate,
     void, ResultsViewController* self, bool first, bool added, bool enabling) {
     SeasonalResultsOpen(self, first, added, enabling);
     if (!added || !self) return;
     auto* result = self->__cordl_internal_get__levelCompletionResults();
-    if (!result || result->__cordl_internal_get_rank().value__ < 5) return;
-    if (currentTheme == Theme::ChristmasEve) ChristmasEve::aurora::BeginResults();
+    if (!result || result->__cordl_internal_get_levelEndStateType() != LevelCompletionResultsBase::LevelEndStateType::Cleared ||
+        result->__cordl_internal_get_rank().value__ < RankModel::Rank::S.value__) return;
+    if (currentTheme == Theme::ChristmasEve) {
+        ChristmasEve::aurora::BeginResults();
+        ReplaceResultsFireworks(true);
+    }
     if (currentTheme == Theme::NewYears) StartCelebration();
     if (currentTheme == Theme::Halloween) {
         Halloween::ghostDrift::SetResultsScreen(self, true);
         Halloween::ghostSting::EnterResults();
-        Halloween::ghostDrift::Begin();
+        if (Halloween::ghostDrift::Begin()) ReplaceResultsFireworks(false);
     }
 }
 
 MAKE_HOOK_MATCH(SeasonalResultsClose, &ResultsViewController::DidDeactivate,
     void, ResultsViewController* self, bool removed, bool disabling) {
     if (currentTheme == Theme::ChristmasEve) ChristmasEve::aurora::EndResults();
+    RestoreResultsFireworks();
     StopCelebration();
     Halloween::ghostSting::ExitResults();
     Halloween::ghostDrift::EndResultsScreen();
@@ -627,6 +717,9 @@ extern "C" __attribute__((visibility("default"))) void late_load() noexcept {
     LoadTheme();
     INSTALL_HOOK(PaperLogger, SeasonalMenuDidActivate);
     INSTALL_HOOK(PaperLogger, SeasonalMenuLighting);
+    INSTALL_HOOK(PaperLogger, SeasonalFireworkInit);
+    INSTALL_HOOK(PaperLogger, SeasonalFireworkSound);
+    INSTALL_HOOK(PaperLogger, SeasonalFireworkLights);
     INSTALL_HOOK(PaperLogger, SeasonalResultsOpen);
     INSTALL_HOOK(PaperLogger, SeasonalResultsClose);
     INSTALL_HOOK(PaperLogger, SeasonalSongPlayerEnable);
