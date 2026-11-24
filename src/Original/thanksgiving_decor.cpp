@@ -3,8 +3,7 @@
 
 
 #include "assets.hpp"
-#include "beatsaber-hook/shared/utils/il2cpp-utils.hpp"
-#include "beatsaber-hook/shared/utils/typedefs.h"
+#include "beatsaber-hook/shared/arrayw.hpp"
 #define INFO(...) ((void)0)
 #define WARNING(...) ((void)0)
 #define ERROR(...) ((void)0)
@@ -302,16 +301,15 @@ namespace Thanksgiving::pumpkinAccents {
                 if (i == 17 && clusterIndex == 5) {
                     extraPrefabPath = "Assets/Prefabs/Thanksgiving_Wooden_Crate.prefab";
                 }
-                auto extraPrefab = harvestBundle->LoadAsset(extraPrefabPath);
+                auto extraPrefab = harvestBundle->LoadAsset<GameObject*>(extraPrefabPath);
 
                 if (extraPrefab) {
                     auto extraInstance = UnityEngine::Object::Instantiate(
-                        extraPrefab.ptr(), root, false);
+                        extraPrefab, root, false);
 
                     if (extraInstance) {
                         auto* extraObject =
-                            il2cpp_utils::try_cast<UnityEngine::GameObject>(
-                                extraInstance.ptr()).value_or(nullptr);
+                            extraInstance;
 
                         if (extraObject) {
                             auto extraTransform = extraObject->get_transform();
@@ -357,7 +355,7 @@ namespace Thanksgiving::pumpkinAccents {
             for (int crateIndex = 0; crateIndex < 5; ++crateIndex) {
                 if (i != cratePositions[crateIndex] || !harvestBundle) continue;
 
-                auto cratePrefab = harvestBundle->LoadAsset(
+                auto cratePrefab = harvestBundle->LoadAsset<GameObject*>(
                     "Assets/Prefabs/Thanksgiving_Wooden_Crate.prefab");
 
                 if (!cratePrefab) {
@@ -366,7 +364,7 @@ namespace Thanksgiving::pumpkinAccents {
                 }
 
                 auto crateInstance = UnityEngine::Object::Instantiate(
-                    cratePrefab.ptr(), root, false);
+                    cratePrefab, root, false);
 
                 if (!crateInstance) {
                     WARNING("[Thanksgiving CRATE] Instantiation failed at position {}", i + 1);
@@ -374,8 +372,7 @@ namespace Thanksgiving::pumpkinAccents {
                 }
 
                 auto* crateObject =
-                    il2cpp_utils::try_cast<UnityEngine::GameObject>(
-                        crateInstance.ptr()).value_or(nullptr);
+                    crateInstance;
 
                 if (!crateObject) continue;
 
@@ -430,7 +427,7 @@ namespace Thanksgiving::pumpkinAccents {
             for (int cornIndex = 0; cornIndex < 4; ++cornIndex) {
                 if (i != cornPositions[cornIndex] || !harvestBundle) continue;
 
-                auto cornPrefab = harvestBundle->LoadAsset(
+                auto cornPrefab = harvestBundle->LoadAsset<GameObject*>(
                     "Assets/Prefabs/Thanksgiving_Single_Corn_Stalk.prefab");
 
                 if (!cornPrefab) {
@@ -439,7 +436,7 @@ namespace Thanksgiving::pumpkinAccents {
                 }
 
                 auto cornInstance = UnityEngine::Object::Instantiate(
-                    cornPrefab.ptr(), root, false);
+                    cornPrefab, root, false);
 
                 if (!cornInstance) {
                     WARNING("[Thanksgiving CORN] Single-stalk instantiation failed at position {}", i + 1);
@@ -447,8 +444,7 @@ namespace Thanksgiving::pumpkinAccents {
                 }
 
                 auto* cornObject =
-                    il2cpp_utils::try_cast<UnityEngine::GameObject>(
-                        cornInstance.ptr()).value_or(nullptr);
+                    cornInstance;
 
                 if (!cornObject) continue;
 
@@ -517,19 +513,19 @@ namespace Thanksgiving::pumpkinAccents {
                 } else {
                     INFO("[Thanksgiving v1.4] Loading prefab {} at position {}.", prefabPath, i + 1);
 
-                    auto prefab = harvestBundle->LoadAsset(prefabPath);
+                    auto prefab = harvestBundle->LoadAsset<GameObject*>(prefabPath);
 
                     if (!prefab) {
                         WARNING("[Thanksgiving v1.4] Prefab not found at position {}: {}", i + 1, prefabPath);
                     } else {
                         auto instance = UnityEngine::Object::Instantiate(
-                            prefab.ptr(), root, false);
+                            prefab, root, false);
 
                         if (instance) {
                             INFO("[Thanksgiving v1.4] Prefab instantiated successfully at position {}.", i + 1);
 
                             auto* instanceObject =
-                                il2cpp_utils::try_cast<UnityEngine::GameObject>(instance.ptr()).value_or(nullptr);
+                                instance;
 
                             if (!instanceObject) {
                                 WARNING("[Thanksgiving v1.4 DIAG] Position {}: instance is not a GameObject.", i + 1);

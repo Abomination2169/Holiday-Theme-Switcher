@@ -2,8 +2,7 @@
 #include "bsml/shared/BSML.hpp"
 
 #include "assets.hpp"
-#include "beatsaber-hook/shared/utils/il2cpp-utils.hpp"
-#include "beatsaber-hook/shared/utils/typedefs.h"
+#include "beatsaber-hook/shared/arrayw.hpp"
 #define INFO(...) ((void)0)
 #define WARNING(...) ((void)0)
 #define ERROR(...) ((void)0)

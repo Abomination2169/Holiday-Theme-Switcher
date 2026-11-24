@@ -20,7 +20,6 @@ static constexpr auto PaperLogger = Paper::ConstLoggerContext("seasonalthemes-au
 #include "UnityEngine/Object.hpp"
 #include "UnityEngine/SceneManagement/SceneManager.hpp"
 #include "UnityEngine/SceneManagement/Scene.hpp"
-#include "beatsaber-hook/shared/utils/il2cpp-utils.hpp"
 #include <functional>
 #include <unistd.h>
 #include <mutex>
@@ -316,7 +315,7 @@ void SeasonalAudio::EnterMenu(GlobalNamespace::MainMenuViewController* menu) {
     // The scheduler and audio source must not live on the menu GameObject:
     // Beat Saber can disable that object during gameplay.
     if (!ticker || !ticker->get_gameObject()) {
-        auto controller = UnityEngine::GameObject::New_ctor(il2cpp_utils::newcsstr("ThanksgivingGobbleController"));
+        auto controller = UnityEngine::GameObject::New_ctor("ThanksgivingGobbleController");
         if (!controller) {
             PaperLogger.error("Gobble controller creation failed");
             return;

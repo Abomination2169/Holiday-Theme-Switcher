@@ -13,7 +13,7 @@
 #include "UnityEngine/MeshFilter.hpp"
 #include "UnityEngine/Mesh.hpp"
 #include "UnityEngine/Object.hpp"
-#include "beatsaber-hook/shared/utils/typedefs-array.hpp"
+#include "beatsaber-hook/shared/arrayw.hpp"
 #include "UnityEngine/Material.hpp"
 
 //using namespace GlobalNamespace;

@@ -43,8 +43,8 @@
 #include "UnityEngine/SceneManagement/SceneManager.hpp"
 #include "UnityEngine/SceneManagement/SceneManagement.hpp"
 #include "scotland2/shared/modloader.h"
-#include "beatsaber-hook/shared/utils/hooking.hpp"
-#include "beatsaber-hook/shared/utils/il2cpp-functions.hpp"
+#include "beatsaber-hook/shared/hooking.hpp"
+#include "beatsaber-hook/shared/api.hpp"
 #include "paper2_scotland2/shared/logger.hpp"
 #include "bsml/shared/BSML.hpp"
 #include <fstream>
@@ -644,7 +644,7 @@ MAKE_HOOK_MATCH(SeasonalResultsClose, &ResultsViewController::DidDeactivate,
 extern "C" __attribute__((visibility("default"))) void setup(CModInfo* info) noexcept { *info = modInfo.to_c(); }
 
 extern "C" __attribute__((visibility("default"))) void late_load() noexcept {
-    il2cpp_functions::Init();
+    i2c::functions::initialize();
     custom_types::Register::AutoRegister();
     LoadTheme();
     INSTALL_HOOK(PaperLogger, SeasonalMenuDidActivate);
