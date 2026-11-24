@@ -8,22 +8,22 @@ Switch between seasonal Beat Saber menu environments instantly, or let the calen
 
 ## Themes
 
-- **Default 🎮** — Beat Saber's normal menu appearance and soundtrack.
-- **Halloween 🎃** — spooky lighting, pumpkins, falling autumn leaves, and themed menu music.
-- **Thanksgiving 🦃** — golden harvest decorations, falling leaves, and occasional turkey gobbles.
-- **Christmas Eve ❄️** — layered snowfall, snowdrifts, a mountain backdrop, and a results-screen aurora.
-- **New Years 🥂** — midnight lighting, crystal ball, confetti, fireworks, and a menu track selected from the user's installed custom songs.
-- **Dynamic 📅** — chooses the appropriate theme using the headset's local date.
+- **Default 🎮** — Beat Saber's standard menu appearance and soundtrack.
+- **Halloween 🎃** — Happy Halloween! Transform your Beat Saber menu into a spooky graveyard with falling autumn leaves.
+- **Thanksgiving 🦃** — Transform your Beat Saber menu with golden harvest lighting, seasonal decorations, and gently falling leaves!
+- **Christmas Eve ❄️** — Celebrate Christmas Eve on a peaceful, snowy alpine winter night.
+- **New Years 🥂** — Transform your Beat Saber menu into a dazzling midnight celebration with colorful fireworks, falling confetti, and custom songs from your very own playlist!
+- **Dynamic 📅** — Chooses the appropriate theme using the headset's local time and date.
 
 ### Dynamic calendar
 
 | Dates | Theme |
 | --- | --- |
+| February 1–September 30 | Default |
 | October 1–31 | Halloween |
 | November 1–30 | Thanksgiving |
-| December 1–30 | Christmas Eve ❄️ |
+| December 1–30 | Christmas Eve  |
 | December 31–January 31 | New Years |
-| February 1–September 30 | Default |
 
 Manual selections stay selected until changed. A saved original Christmas selection opens Christmas Eve. Dynamic mode rechecks the calendar while outside gameplay.
 
