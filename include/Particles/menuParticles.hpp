@@ -15,6 +15,7 @@ namespace Seasonal {
         float wind;
         float flutter;
         float spin;
+        bool useDustMaterial = false;
     };
 
     // Transfers ownership of the optional sprite sheet to the emitter.

@@ -95,12 +95,12 @@ namespace {
 
     std::unordered_map<Seasonal::MenuParticleController*, std::unique_ptr<Emitter>> emitters;
 
-    Texture* FindDustTexture() {
+    Material* FindDustMaterial() {
         for (auto* particle : Resources::FindObjectsOfTypeAll<ParticleSystem*>()) {
             if (!particle || particle->name != "DustPS") continue;
             auto* renderer = particle->GetComponent<ParticleSystemRenderer*>();
             auto* material = renderer ? renderer->get_sharedMaterial().ptr() : nullptr;
-            if (material && material->get_mainTexture()) return material->get_mainTexture().ptr();
+            if (material && material->get_mainTexture()) return material;
         }
         return nullptr;
     }
@@ -156,8 +156,10 @@ namespace {
 UnityEngine::GameObject* Seasonal::CreateMenuParticles(const char* name, const MenuParticlePattern& pattern,
                                                        UnityEngine::Texture2D* spriteSheet, int frames) {
     using namespace UnityEngine;
-    auto* shader = Shader::Find("Sprites/Default").ptr();
-    if (!shader) {
+    auto* dustMaterial = (!spriteSheet || pattern.useDustMaterial) ? FindDustMaterial() : nullptr;
+    auto* crystalTemplate = pattern.useDustMaterial ? dustMaterial : nullptr;
+    auto* shader = crystalTemplate ? nullptr : Shader::Find("Sprites/Default").ptr();
+    if (!crystalTemplate && !shader) {
         if (spriteSheet) Object::Destroy(spriteSheet);
         return nullptr;
     }
@@ -174,15 +176,22 @@ UnityEngine::GameObject* Seasonal::CreateMenuParticles(const char* name, const M
     emitter->pattern = pattern;
     emitter->particles.resize(pattern.capacity);
     controller->ownedTexture = spriteSheet;
-    Texture* texture = spriteSheet ? spriteSheet : FindDustTexture();
+    Texture* texture = spriteSheet;
+    if (!texture && dustMaterial) texture = dustMaterial->get_mainTexture().ptr();
     if (!texture) {
         controller->ownedTexture = CreateSoftFlakeTexture();
         texture = controller->ownedTexture;
     }
 
-    controller->particleMaterial = Material::New_ctor(shader);
+    // The original crystal flakes used a private copy of DustPS's material.
+    // Keep its tint and blend settings when replacing the texture.
+    controller->particleMaterial = crystalTemplate
+        ? Object::Instantiate(crystalTemplate)
+        : Material::New_ctor(shader);
     controller->particleMaterial->set_mainTexture(texture);
-    controller->particleMaterial->SetColor(StringW("_Color"), Color(1, 1, 1, 1));
+    if (!crystalTemplate) {
+        controller->particleMaterial->SetColor(StringW("_Color"), Color(1, 1, 1, 1));
+    }
 
     controller->particleMesh = Mesh::New_ctor();
     controller->particleMesh->MarkDynamic();
