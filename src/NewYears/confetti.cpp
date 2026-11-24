@@ -1,4 +1,3 @@
-#include "UnityEngine/ParticleSystem_MinMaxCurve.hpp"
 #include "beatsaber-hook/shared/safeptr.hpp"
 #include "NewYears/newYears.hpp"
 #include "AutumnLeaves/particleController.hpp"

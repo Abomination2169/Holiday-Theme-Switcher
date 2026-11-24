@@ -8,7 +8,8 @@
 propertyType ChristmasEveFlair::ParticleController::moduleType::get_##propertyName(UnityEngine::ParticleSystem* particleSystem) { \
     static auto GetterFunc = i2c::resolve_icall<propertyType, UnityEngine::ParticleSystem::moduleType*>("UnityEngine.ParticleSystem/" #moduleType "::get_" #propertyName "_Injected").value_or(nullptr); \
     UnityEngine::ParticleSystem::moduleType moduleObj = particleSystem->moduleName; \
-    return GetterFunc ? GetterFunc(&moduleObj) : propertyType{}; \
+    if (!GetterFunc) return {}; \
+    return GetterFunc(&moduleObj); \
 } \
 void ChristmasEveFlair::ParticleController::moduleType::set_##propertyName(UnityEngine::ParticleSystem* particleSystem, propertyType value) { \
     static auto SetterFunc = i2c::resolve_icall<void, UnityEngine::ParticleSystem::moduleType*, propertyType>("UnityEngine.ParticleSystem/" #moduleType "::set_" #propertyName "_Injected").value_or(nullptr); \
@@ -56,14 +57,16 @@ void ChristmasEveFlair::ParticleController::moduleType::funcName(UnityEngine::Pa
 returnType ChristmasEveFlair::ParticleController::moduleType::funcName(UnityEngine::ParticleSystem* particleSystem) { \
     static auto Func = i2c::resolve_icall<returnType, UnityEngine::ParticleSystem::moduleType*>("UnityEngine.ParticleSystem/" #moduleType "::" #funcName "_Injected").value_or(nullptr); \
     UnityEngine::ParticleSystem::moduleType moduleObj = particleSystem->moduleName; \
-    return Func ? Func(&moduleObj) : returnType{}; \
+    if (!Func) return {}; \
+    return Func(&moduleObj); \
 }
 
 #define DEFINE_RETURN_1(returnType, moduleType, moduleName, funcName, para1Type, para1Name) \
 returnType ChristmasEveFlair::ParticleController::moduleType::funcName(UnityEngine::ParticleSystem* particleSystem, para1Type para1Name) { \
     static auto Func = i2c::resolve_icall<returnType, UnityEngine::ParticleSystem::moduleType*, para1Type>("UnityEngine.ParticleSystem/" #moduleType "::" #funcName "_Injected").value_or(nullptr); \
     UnityEngine::ParticleSystem::moduleType moduleObj = particleSystem->moduleName; \
-    return Func ? Func(&moduleObj, para1Name) : returnType{}; \
+    if (!Func) return {}; \
+    return Func(&moduleObj, para1Name); \
 }
 
 

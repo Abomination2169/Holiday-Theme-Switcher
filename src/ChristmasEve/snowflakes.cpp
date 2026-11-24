@@ -1,4 +1,3 @@
-#include "UnityEngine/ParticleSystem_MinMaxCurve.hpp"
 #include "beatsaber-hook/shared/safeptr.hpp"
 #include "ChristmasEve/snow.hpp"
 #include "assets.hpp"
