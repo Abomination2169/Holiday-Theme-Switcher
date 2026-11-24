@@ -129,7 +129,6 @@ namespace {
             const float friction = std::max(0.0f, 1.0f - 5.0f * dt);
             particle.driftX *= friction;
             particle.driftZ *= friction;
-            particle.spin *= friction;
             particle.position.x += particle.driftX * dt;
             particle.position.z += particle.driftZ * dt;
         } else {
@@ -269,16 +268,18 @@ void Seasonal::MenuParticleController::LateUpdate() {
                 const float halfSize = particle.size * 0.5f;
                 const float sine = std::sin(particle.rotation) * halfSize;
                 const float cosine = std::cos(particle.rotation) * halfSize;
-                const Vector3 quadRight = particle.grounded ? Vector3(1, 0, 0) : right;
-                const Vector3 quadUp = particle.grounded ? Vector3(0, 0, 1) : up;
-                const Vector3 horizontal(quadRight.x * cosine + quadUp.x * sine,
-                                         quadRight.y * cosine + quadUp.y * sine,
-                                         quadRight.z * cosine + quadUp.z * sine);
-                const Vector3 vertical(quadUp.x * cosine - quadRight.x * sine,
-                                       quadUp.y * cosine - quadRight.y * sine,
-                                       quadUp.z * cosine - quadRight.z * sine);
+                // Keep the camera-facing sprite after impact. Lift its center
+                // by the rotated quad's vertical extent so its lowest edge
+                // rests at the floor even when it keeps turning.
+                const Vector3 horizontal(right.x * cosine + up.x * sine,
+                                         right.y * cosine + up.y * sine,
+                                         right.z * cosine + up.z * sine);
+                const Vector3 vertical(up.x * cosine - right.x * sine,
+                                       up.y * cosine - right.y * sine,
+                                       up.z * cosine - right.z * sine);
+                const float restingY = floorY + std::abs(horizontal.y) + std::abs(vertical.y);
                 const Vector3 center(particle.position.x,
-                                     particle.grounded ? floorY + 0.003f : particle.position.y,
+                                     particle.grounded ? restingY : std::max(particle.position.y, restingY),
                                      particle.position.z);
                 positions[vertex] = Vector3(center.x - horizontal.x - vertical.x,
                                             center.y - horizontal.y - vertical.y,
