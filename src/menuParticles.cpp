@@ -122,7 +122,7 @@ namespace {
         return texture;
     }
 
-    void Advance(Particle& particle, const MenuParticlePattern& pattern, float dt, float wind) {
+    void Advance(Particle& particle, const MenuParticlePattern& pattern, float dt, float wind, float contactY) {
         const float age = pattern.lifetime - particle.remaining;
         particle.remaining -= dt;
         if (particle.grounded) {
@@ -141,7 +141,6 @@ namespace {
             particle.downwardVelocity -= gravity * pattern.gravityMultiplier * dt;
             particle.position.y += particle.downwardVelocity * dt;
 
-            const float contactY = floorY + 0.5f * particle.size;
             if (particle.position.y <= contactY) {
                 particle.position.y = contactY;
                 particle.downwardVelocity = 0.0f;
@@ -151,7 +150,6 @@ namespace {
                 particle.grounded = true;
             }
         }
-        particle.rotation += particle.spin * dt;
     }
 }
 
@@ -263,21 +261,23 @@ void Seasonal::MenuParticleController::LateUpdate() {
         auto& particle = emitter.particles[i];
         const int vertex = i * 4;
         if (particle.remaining > 0.0f) {
-            Advance(particle, pattern, dt, wind);
+            const float halfSize = particle.size * 0.5f;
+            const float sine = std::sin(particle.rotation) * halfSize;
+            const float cosine = std::cos(particle.rotation) * halfSize;
+            // Keep the camera-facing sprite after impact. Lift its center
+            // by the rotated quad's vertical extent so its lowest edge
+            // rests at the floor without changing its landing angle.
+            const Vector3 horizontal(right.x * cosine + up.x * sine,
+                                     right.y * cosine + up.y * sine,
+                                     right.z * cosine + up.z * sine);
+            const Vector3 vertical(up.x * cosine - right.x * sine,
+                                   up.y * cosine - right.y * sine,
+                                   up.z * cosine - right.z * sine);
+            const float restingY = floorY + std::abs(horizontal.y) + std::abs(vertical.y);
+            Advance(particle, pattern, dt, wind, restingY);
+            if (!particle.grounded) particle.rotation += particle.spin * dt;
+
             if (particle.remaining > 0.0f) {
-                const float halfSize = particle.size * 0.5f;
-                const float sine = std::sin(particle.rotation) * halfSize;
-                const float cosine = std::cos(particle.rotation) * halfSize;
-                // Keep the camera-facing sprite after impact. Lift its center
-                // by the rotated quad's vertical extent so its lowest edge
-                // rests at the floor even when it keeps turning.
-                const Vector3 horizontal(right.x * cosine + up.x * sine,
-                                         right.y * cosine + up.y * sine,
-                                         right.z * cosine + up.z * sine);
-                const Vector3 vertical(up.x * cosine - right.x * sine,
-                                       up.y * cosine - right.y * sine,
-                                       up.z * cosine - right.z * sine);
-                const float restingY = floorY + std::abs(horizontal.y) + std::abs(vertical.y);
                 const Vector3 center(particle.position.x,
                                      particle.grounded ? restingY : std::max(particle.position.y, restingY),
                                      particle.position.z);
