@@ -30,6 +30,7 @@
 
 #include <algorithm>
 #include <cmath>
+#include <cstring>
 #include <memory>
 #include <random>
 #include <string>
@@ -79,7 +80,7 @@ namespace {
     struct Emitter {
         MenuParticlePattern pattern;
         std::vector<Particle> particles;
-        std::vector<std::vector<ParticleSystem_Particle>> nativeBatches;
+        std::vector<ParticleSystem_Particle> nativeBuffer;
         std::mt19937 random{std::random_device{}()};
         float emissionRemainder = 0.0f;
         int nextSlot = 0;
@@ -154,6 +155,9 @@ namespace {
             main.set_playOnAwake(false);
             main.set_simulationSpace(ParticleSystemSimulationSpace::World);
             main.set_maxParticles(capacity);
+            particles->set_startSize(emitter.pattern.maxSize);
+            particles->set_startLifetime(emitter.pattern.lifetime);
+            particles->set_gravityModifier(emitter.pattern.gravityMultiplier);
             particles->emission.set_enabled(false);
             clone->SetActive(true);
             systems[frame] = particles;
@@ -175,15 +179,47 @@ namespace {
         controller->nativeSystems = systems.operator->();
         controller->nativeMaterials = materials.operator->();
         controller->nativeTextures = textures.operator->();
-        emitter.nativeBatches.resize(frames);
-        for (auto& batch : emitter.nativeBatches) batch.reserve(capacity);
+        emitter.nativeBuffer.resize(capacity);
         root->SetActive(true);
         for (auto* particles : systems) {
-            particles->Play(false);
-            particles->Pause(false);
             particles->Clear(false);
+            particles->Play(false);
         }
         return true;
+    }
+
+    void UpdateNativeSnow(ArrayW<ParticleSystem*> systems, Emitter& emitter, int toSpawn) {
+        const auto& pattern = emitter.pattern;
+        for (int i = 0; i < toSpawn; ++i) {
+            const int frame = std::uniform_int_distribution<int>(0, systems.size() - 1)(emitter.random);
+            ParticleSystem_EmitParams params{};
+            // The generated default constructor leaves the override flags uninitialized.
+            std::memset(&params, 0, sizeof(params));
+            params.set_position(Vector3(emitter.Range(-spawnHalfWidth, spawnHalfWidth),
+                                        pattern.height + emitter.Range(-0.5f, 0.5f),
+                                        emitter.Range(-spawnHalfWidth, spawnHalfWidth)));
+            // Only override the spawn position. Unity samples DustPS's original
+            // color, angle and velocity and evaluates its curves while playing.
+            systems[frame]->Emit(params, 1);
+        }
+
+        auto& buffer = emitter.nativeBuffer;
+        const System::IntPtr data(buffer.data());
+        const int capacity = static_cast<int>(buffer.size());
+        const float contactY = floorY + pattern.maxSize * 0.5f;
+        for (auto* system : systems) {
+            const int count = system->GetParticlesWithNativeArray(data, capacity, capacity, 0);
+            bool touched = false;
+            for (int i = 0; i < count; ++i) {
+                auto& particle = buffer[i];
+                if (particle.m_Position.y >= contactY) continue;
+                particle.m_Position.y = contactY;
+                particle.m_Velocity.y = std::max(0.0f, particle.m_Velocity.y);
+                particle.m_AngularVelocity = Vector3(0, 0, 0);
+                touched = true;
+            }
+            if (touched) system->SetParticlesWithNativeArray(data, capacity, count, 0);
+        }
     }
 
     Texture2D* CreateSoftFlakeTexture() {
@@ -373,14 +409,16 @@ void Seasonal::MenuParticleController::LateUpdate() {
     emitter.emissionRemainder += pattern.rate * dt;
     int toSpawn = static_cast<int>(emitter.emissionRemainder);
     emitter.emissionRemainder -= toSpawn;
+    if (nativeSystems) {
+        UpdateNativeSnow(ArrayW<ParticleSystem*>(nativeSystems), emitter, toSpawn);
+        return;
+    }
     while (toSpawn-- > 0) {
         auto& particle = emitter.particles[emitter.nextSlot];
         if (particle.remaining <= 0.0f) emitter.Spawn(particle);
         emitter.nextSlot = (emitter.nextSlot + 1) % pattern.capacity;
     }
 
-    const bool useNativeRenderer = !emitter.nativeBatches.empty();
-    for (auto& batch : emitter.nativeBatches) batch.clear();
     ArrayW<Vector3> positions(vertexBuffer);
     ArrayW<Color32> crystalColors(crystalColorBuffer);
     const Vector3 eye = pattern.useNativeDustRenderer && view ? view->get_position() : Vector3(0, 1.6f, 0);
@@ -409,18 +447,6 @@ void Seasonal::MenuParticleController::LateUpdate() {
                 const Vector3 center(particle.position.x,
                                      particle.grounded ? restingY : std::max(particle.position.y, restingY),
                                      particle.position.z);
-                if (useNativeRenderer) {
-                    auto& batch = emitter.nativeBatches[i % emitter.nativeBatches.size()];
-                    auto& flake = batch.emplace_back();
-                    flake.set_position(center);
-                    flake.set_startSize(particle.size);
-                    flake.set_startLifetime(pattern.lifetime);
-                    flake.set_remainingLifetime(particle.remaining);
-                    flake.set_startColor(CrystalReflection(particle, eye, displayedAngle));
-                    flake.set_randomSeed(static_cast<uint32_t>(i + 1));
-                    flake.set_rotation3D(Vector3(0.0f, 0.0f, displayedAngle * (360.0f / fullTurn)));
-                    continue;
-                }
                 if (crystalColorBuffer) {
                     const auto tint = CrystalReflection(particle, eye, displayedAngle);
                     for (int j = 0; j < 4; ++j) crystalColors[vertex + j] = tint;
@@ -440,19 +466,8 @@ void Seasonal::MenuParticleController::LateUpdate() {
                 continue;
             }
         }
-        if (!useNativeRenderer) {
-            for (int j = 0; j < 4; ++j) positions[vertex + j] = Vector3(0, 0, 0);
-        }
+        for (int j = 0; j < 4; ++j) positions[vertex + j] = Vector3(0, 0, 0);
     }
-    if (useNativeRenderer) {
-        ArrayW<ParticleSystem*> systems(nativeSystems);
-        for (size_t i = 0; i < emitter.nativeBatches.size(); ++i) {
-            auto& batch = emitter.nativeBatches[i];
-            systems[i]->SetParticlesWithNativeArray(System::IntPtr(batch.data()), batch.size(), batch.size(), 0);
-        }
-        return;
-    }
-
     if (crystalColorBuffer) particleMesh->set_colors32(crystalColors);
     particleMesh->SetVertices(positions, 0, pattern.capacity * 4,
                                Rendering::MeshUpdateFlags::DontRecalculateBounds);
