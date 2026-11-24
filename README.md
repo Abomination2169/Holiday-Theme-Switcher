@@ -1,5 +1,7 @@
 # Holiday Theme Switcher
 
+![Holiday Theme Switcher preview](HolidayThemeSwitcher-README.png)
+
 Switch between seasonal Beat Saber menu environments instantly, or let the calendar select a theme automatically.
 
 **Compatibility:** Meta Quest 3 · Beat Saber **1.40.8_7379** · Quest QMOD `seasonalthemes` · **v1.0.0**
