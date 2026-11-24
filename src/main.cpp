@@ -1,3 +1,4 @@
+#include "beatsaber-hook/shared/safeptr.hpp"
 // Development-stage lighting-only prototype for Beat Saber 1.40.8_7379.
 // Seasonal audio and artwork are incorporated at build time; see THIRD_PARTY_NOTICES.md.
 #include "GlobalNamespace/MainMenuViewController.hpp"
@@ -65,7 +66,7 @@ static Theme currentTheme = Theme::Halloween;
 static bool dynamicMode = false;
 
 namespace {
-    SafePtrUnity<MeshRenderer> menuFloor;
+    safe_ptr<MeshRenderer*, true> menuFloor;
     Color menuFloorBaseline{};
     bool hasMenuFloorBaseline = false;
     bool floorRestorationActive = false;
@@ -565,8 +566,8 @@ static void RefreshLights() {
 }
 
 namespace {
-    SafePtrUnity<GameObject> celebrationHost;
-    SafePtrUnity<AudioClip> celebrationClip;
+    safe_ptr<GameObject*, true> celebrationHost;
+    safe_ptr<AudioClip*, true> celebrationClip;
     bool celebrationActive = false;
     bool celebrationPlayed = false;
     bool celebrationLoading = false;

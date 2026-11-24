@@ -1,3 +1,4 @@
+#include "beatsaber-hook/shared/safeptr.hpp"
 #include "NewYears/newYears.hpp"
 #include "AutumnLeaves/particleController.hpp"
 #include "assets.hpp"
@@ -15,8 +16,8 @@ using namespace UnityEngine;
 using namespace Flair;
 
 namespace NewYears::confetti {
-static SafePtrUnity<GameObject> templateDust;
-static SafePtrUnity<GameObject> confettiGo;
+static safe_ptr<GameObject*, true> templateDust;
+static safe_ptr<GameObject*, true> confettiGo;
 
 void CreateConfetti() {
     if (confettiGo) return;

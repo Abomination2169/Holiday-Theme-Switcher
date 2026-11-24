@@ -1,3 +1,4 @@
+#include "beatsaber-hook/shared/safeptr.hpp"
 #include "Audio/ghostDriftController.hpp"
 #include "Audio/ghostSting.hpp"
 
@@ -52,8 +53,8 @@ namespace {
     };
 
     std::vector<ActiveGhost> active;
-    SafePtrUnity<GameObject> root;
-    SafePtrUnity<GlobalNamespace::ResultsViewController> resultsScreen;
+    safe_ptr<GameObject*, true> root;
+    safe_ptr<GlobalNamespace::ResultsViewController*, true> resultsScreen;
     bool resultsVisible = false;
     bool rankEligible = false;
 

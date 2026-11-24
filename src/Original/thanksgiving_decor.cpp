@@ -1,3 +1,4 @@
+#include "beatsaber-hook/shared/safeptr.hpp"
 
 #include "bsml/shared/BSML.hpp"
 
@@ -35,7 +36,7 @@ using namespace UnityEngine;
 
 // Keep the original namespace and entry points used by main.cpp.
 namespace Thanksgiving::pumpkinAccents {
-    SafePtrUnity<GameObject> pumpkinAccents;
+    safe_ptr<GameObject*, true> pumpkinAccents;
 
     struct HarvestSpot {
         Vector3 originalPosition;

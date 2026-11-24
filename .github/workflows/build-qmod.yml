@@ -61,7 +61,7 @@ jobs:
           test -n "$NDK_TOOLCHAIN"
           echo "ANDROID_NDK_HOME=${NDK_TOOLCHAIN%/build/cmake/android.toolchain.cmake}" >> "$GITHUB_ENV"
           cmake -S . -B build -G Ninja -DCMAKE_BUILD_TYPE=RelWithDebInfo
-          cmake --build build --parallel
+          cmake --build build --parallel -- -k 0
           test -s build/libseasonalthemes.so
       - name: Package and validate test QMOD
         run: |

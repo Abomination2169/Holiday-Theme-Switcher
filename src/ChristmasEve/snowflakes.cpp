@@ -1,3 +1,4 @@
+#include "beatsaber-hook/shared/safeptr.hpp"
 #include "ChristmasEve/snow.hpp"
 #include "assets.hpp"
 #include "paper2_scotland2/shared/logger.hpp"
@@ -32,11 +33,11 @@ DEFINE_TYPE(ChristmasEve, SnowWindController);
 
 namespace ChristmasEve::snowflakes {
     namespace {
-        SafePtrUnity<GameObject> dustGo;
-        SafePtrUnity<GameObject> fineGo;
-        SafePtrUnity<GameObject> mediumGo;
-        SafePtrUnity<GameObject> snowflakesGo;
-        SafePtrUnity<GameObject> collisionFloor;
+        safe_ptr<GameObject*, true> dustGo;
+        safe_ptr<GameObject*, true> fineGo;
+        safe_ptr<GameObject*, true> mediumGo;
+        safe_ptr<GameObject*, true> snowflakesGo;
+        safe_ptr<GameObject*, true> collisionFloor;
         float nextWindUpdate = 0.0f;
 
         // Physics colliders are required for World collision; the menu
@@ -76,7 +77,7 @@ namespace ChristmasEve::snowflakes {
         ParticleSystem* SpawnLayer(const char* name, float height,
                                    float lifetime, float size, float rate,
                                    int limit, float gravity, bool collide,
-                                   SafePtrUnity<GameObject>& emitter) {
+                                   safe_ptr<GameObject*, true>& emitter) {
             auto root = GameObject::Instantiate(dustGo->gameObject);
             if (!root) return nullptr;
             root->name = name;

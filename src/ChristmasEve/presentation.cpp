@@ -1,3 +1,4 @@
+#include "beatsaber-hook/shared/safeptr.hpp"
 #include "ChristmasEve/presentation.hpp"
 #include "paper2_scotland2/shared/logger.hpp"
 #define INFO(message, ...) Paper::Logger::fmtLogTag<Paper::LogLevel::INF>(message, "seasonalthemes" __VA_OPT__(, __VA_ARGS__))
@@ -32,7 +33,7 @@ namespace ChristmasEve {
 namespace ChristmasEve {
 
     namespace {
-        SafePtrUnity<UnityEngine::GameObject> solidE, originalFlicker, originalNeon;
+        safe_ptr<UnityEngine::GameObject*, true> solidE, originalFlicker, originalNeon;
 
         void ReplaceFlickeringE() {
             // Restore the original canvas placement that produced a visible thin E in Quest.
@@ -99,7 +100,7 @@ namespace ChristmasEve {
 
         // Build #63: dark emerald reference tree and glossy left-hook cane, half-size.
         // Tree artwork contains its two presents; neither asset includes lettering.
-        SafePtrUnity<UnityEngine::GameObject> christmasSideDecorations;
+        safe_ptr<UnityEngine::GameObject*, true> christmasSideDecorations;
 
         void InstallChristmasSideDecorations(UnityEngine::Transform* anchorParent,
                                               UnityEngine::Vector3 anchorPosition) {
@@ -160,7 +161,7 @@ namespace ChristmasEve {
                 INFO("[SideDecor] WARNING: decoration hierarchy inactive");
         }
 
-        SafePtrUnity<UnityEngine::GameObject> christmasGarland;
+        safe_ptr<UnityEngine::GameObject*, true> christmasGarland;
         std::array<UnityEngine::UI::Image*, 8> sparkleImages{};
 
         constexpr std::array<float, 8> sparkleX{-205.0f, -174.0f, -128.0f, -90.0f,

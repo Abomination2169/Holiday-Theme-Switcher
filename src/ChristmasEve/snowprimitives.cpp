@@ -1,3 +1,4 @@
+#include "beatsaber-hook/shared/safeptr.hpp"
 #include "ChristmasEve/snow.hpp"
 #include <cmath>
 #include <functional>
@@ -21,7 +22,7 @@ using namespace UnityEngine;
 
 namespace ChristmasEve::snowPrimitives {
 
-    SafePtrUnity<GameObject> snowPrimitives;
+    safe_ptr<GameObject*, true> snowPrimitives;
 
     void CreateSnowPrimitives() {
         // Don't create snow primitives if already created

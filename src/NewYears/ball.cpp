@@ -1,3 +1,4 @@
+#include "beatsaber-hook/shared/safeptr.hpp"
 #include "NewYears/newYears.hpp"
 #include "assets.hpp"
 #include "bsml/shared/Helpers/utilities.hpp"
@@ -15,7 +16,7 @@
 using namespace UnityEngine;
 
 namespace NewYears::ball {
-static SafePtrUnity<GameObject> root;
+static safe_ptr<GameObject*, true> root;
 void Create() {
     if (root) return;
     auto logo = GameObject::Find("SaberLogo");

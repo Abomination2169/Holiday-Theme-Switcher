@@ -1,3 +1,4 @@
+#include "beatsaber-hook/shared/safeptr.hpp"
 #include "AutumnLeaves/autumnLeaves.hpp"
 
 #include "assets.hpp"
@@ -24,8 +25,8 @@ using namespace Flair;
 
 namespace Seasonal::autumnLeaves {
 
-    SafePtrUnity<GameObject> dustGo;
-    SafePtrUnity<GameObject> autumnLeavesGo;
+    safe_ptr<GameObject*, true> dustGo;
+    safe_ptr<GameObject*, true> autumnLeavesGo;
 
     void CreateAutumnLeaves() {
         // Don't create if already created

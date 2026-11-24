@@ -1,3 +1,4 @@
+#include "beatsaber-hook/shared/safeptr.hpp"
 #include "NewYears/newYears.hpp"
 #include "GlobalNamespace/FireworksController.hpp"
 #include "UnityEngine/Resources.hpp"
@@ -8,7 +9,7 @@ using namespace UnityEngine;
 using namespace GlobalNamespace;
 
 namespace NewYears::fireworks {
-static SafePtrUnity<FireworksController> controller;
+static safe_ptr<FireworksController*, true> controller;
 static bool previouslyEnabled = false;
 static bool enabledByMod = false;
 
