@@ -558,10 +558,24 @@ namespace {
     };
     std::vector<SuppressedFirework> suppressedFireworks;
     bool replaceResultsFireworks = false;
-    bool muteResultsFireworkLights = false;
+    struct SuppressedFireworkLight {
+        safe_ptr<FireworkItemController*, true> controller;
+        float intensity;
+    };
+    std::vector<SuppressedFireworkLight> suppressedFireworkLights;
 
     void SuppressFirework(FireworkItemController* controller) {
-        if (!controller || !controller->get_gameObject()->get_activeInHierarchy()) return;
+        if (!controller) return;
+        auto object = controller->get_gameObject();
+        if (!object || !object->get_activeInHierarchy()) return;
+        if (std::none_of(suppressedFireworkLights.begin(), suppressedFireworkLights.end(),
+                         [controller](const auto& saved) {
+            return saved.controller && saved.controller.ptr() == controller;
+        })) {
+            suppressedFireworkLights.push_back({controller, controller->__cordl_internal_get__directionalLightIntensity()});
+        }
+        controller->set_directionalLightIntensity(0.0f);
+        controller->SetLightsColor(0.0f);
         auto systems = controller->__cordl_internal_get__particleSystems();
         if (!systems) return;
         for (auto* entry : systems) {
@@ -578,20 +592,26 @@ namespace {
         }
     }
 
-    void ReplaceResultsFireworks(bool muteLights) {
+    bool IsCelebrationResult(LevelCompletionResults* result) {
+        return result && result->__cordl_internal_get_levelEndStateType() == LevelCompletionResultsBase::LevelEndStateType::Cleared &&
+               result->__cordl_internal_get_rank().value__ >= RankModel::Rank::S.value__;
+    }
+
+    void PrepareResultsFireworks(LevelCompletionResults* result) {
+        if (replaceResultsFireworks || !IsCelebrationResult(result) ||
+            (currentTheme != Theme::Halloween && currentTheme != Theme::ChristmasEve)) return;
         replaceResultsFireworks = true;
-        muteResultsFireworkLights = muteLights;
         for (auto* controller : Resources::FindObjectsOfTypeAll<FireworkItemController*>()) {
             SuppressFirework(controller);
-            if (muteLights && controller && controller->get_gameObject()->get_activeInHierarchy()) {
-                controller->SetLightsColor(0.0f);
-            }
         }
     }
 
     void RestoreResultsFireworks() {
         replaceResultsFireworks = false;
-        muteResultsFireworkLights = false;
+        for (auto& saved : suppressedFireworkLights) {
+            if (saved.controller) saved.controller->set_directionalLightIntensity(saved.intensity);
+        }
+        suppressedFireworkLights.clear();
         for (auto& saved : suppressedFireworks) {
             if (saved.particles) saved.particles->emission.set_enabled(saved.emissionEnabled);
         }
@@ -677,36 +697,46 @@ MAKE_HOOK_MATCH(SeasonalFireworkSound, &FireworkItemController::PlayExplosionSou
 
 MAKE_HOOK_MATCH(SeasonalFireworkLights, &FireworkItemController::SetLightsColor,
     void, FireworkItemController* self, float intensity) {
-    SeasonalFireworkLights(self, muteResultsFireworkLights ? 0.0f : intensity);
+    SeasonalFireworkLights(self, replaceResultsFireworks ? 0.0f : intensity);
+}
+
+MAKE_HOOK_MATCH(SeasonalFireworkFire, &FireworkItemController::Fire,
+    void, FireworkItemController* self) {
+    if (replaceResultsFireworks) SuppressFirework(self);
+    SeasonalFireworkFire(self);
+}
+
+MAKE_HOOK_MATCH(SeasonalResultsInit, &ResultsViewController::Init,
+    void, ResultsViewController* self, LevelCompletionResults* result, IReadonlyBeatmapData* beatmapData,
+    by_ref<BeatmapKey const> key, BeatmapLevel* level, bool practice, bool newHighScore) {
+    RestoreResultsFireworks();
+    PrepareResultsFireworks(result);
+    SeasonalResultsInit(self, result, beatmapData, key, level, practice, newHighScore);
 }
 
 MAKE_HOOK_MATCH(SeasonalResultsOpen, &ResultsViewController::DidActivate,
     void, ResultsViewController* self, bool first, bool added, bool enabling) {
+    auto* result = self ? self->__cordl_internal_get__levelCompletionResults() : nullptr;
+    if (added) PrepareResultsFireworks(result);
     SeasonalResultsOpen(self, first, added, enabling);
-    if (!added || !self) return;
-    auto* result = self->__cordl_internal_get__levelCompletionResults();
-    if (!result || result->__cordl_internal_get_levelEndStateType() != LevelCompletionResultsBase::LevelEndStateType::Cleared ||
-        result->__cordl_internal_get_rank().value__ < RankModel::Rank::S.value__) return;
-    if (currentTheme == Theme::ChristmasEve) {
-        ChristmasEve::aurora::BeginResults();
-        ReplaceResultsFireworks(true);
-    }
+    if (!added || !IsCelebrationResult(result)) return;
+    if (currentTheme == Theme::ChristmasEve) ChristmasEve::aurora::BeginResults();
     if (currentTheme == Theme::NewYears) StartCelebration();
     if (currentTheme == Theme::Halloween) {
         Halloween::ghostDrift::SetResultsScreen(self, true);
         Halloween::ghostSting::EnterResults();
-        if (Halloween::ghostDrift::Begin()) ReplaceResultsFireworks(false);
+        if (!Halloween::ghostDrift::Begin()) RestoreResultsFireworks();
     }
 }
 
 MAKE_HOOK_MATCH(SeasonalResultsClose, &ResultsViewController::DidDeactivate,
     void, ResultsViewController* self, bool removed, bool disabling) {
     if (currentTheme == Theme::ChristmasEve) ChristmasEve::aurora::EndResults();
-    RestoreResultsFireworks();
     StopCelebration();
     Halloween::ghostSting::ExitResults();
     Halloween::ghostDrift::EndResultsScreen();
     SeasonalResultsClose(self, removed, disabling);
+    RestoreResultsFireworks();
 }
 
 extern "C" __attribute__((visibility("default"))) void setup(CModInfo* info) noexcept { *info = modInfo.to_c(); }
@@ -717,6 +747,8 @@ extern "C" __attribute__((visibility("default"))) void late_load() noexcept {
     LoadTheme();
     INSTALL_HOOK(PaperLogger, SeasonalMenuDidActivate);
     INSTALL_HOOK(PaperLogger, SeasonalMenuLighting);
+    INSTALL_HOOK(PaperLogger, SeasonalResultsInit);
+    INSTALL_HOOK(PaperLogger, SeasonalFireworkFire);
     INSTALL_HOOK(PaperLogger, SeasonalFireworkInit);
     INSTALL_HOOK(PaperLogger, SeasonalFireworkSound);
     INSTALL_HOOK(PaperLogger, SeasonalFireworkLights);
