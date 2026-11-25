@@ -1,6 +1,8 @@
 # 📅 Holiday Theme Switcher
 
-![Holiday Theme Switcher preview](HolidayThemeSwitcher-README.png)
+[![Holiday Theme Switcher - Beat Saber](HolidayThemeSwitcher-README.png)](https://www.youtube.com/watch?v=rf5HaCuaLBY)
+
+▶️ **Watch on YouTube:** https://www.youtube.com/watch?v=rf5HaCuaLBY
 
 Switch between seasonal Beat Saber menu environments instantly, or let the calendar select a theme automatically.
 
