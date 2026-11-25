@@ -34,7 +34,7 @@ Manual selections stay selected until changed. A saved original Christmas select
 ## Installation and use
 
 1. Download the **v1.0.0 QMOD** from the matching GitHub release after publication, or the successful release-candidate GitHub Actions artifact for testing.
-2. Install it using your normal Quest Beat Saber mod installer for **1.40.8_7379**.
+2. Install it using your normal Quest Beat Saber mod installer for **1.40.8_7379** or **1.45.3_30054**
 3. **Disable standalone Halloween, Thanksgiving, Christmas, Christmas Eve, and New Year's theme mods** before using the switcher. They can compete for the same menu effects and audio.
 4. Open **Holiday Theme Switcher** from the Beat Saber main menu, then choose a theme or **Dynamic**.
 
