@@ -8,7 +8,7 @@ Based on the fantastic Christmas Mod by Vcmikuu and CatsaCode.
 
 Note: Development assisted with use of A.I. Please support talented artists and coders whenever possible.
 
-**Compatible with:** Beat Saber 1.40.8 (Quest)
+**Compatible with:** Beat Saber 1.40.8 & 1.45.3 (Quest)
 
 ## Themes
 
