@@ -8,6 +8,8 @@
 #include "ChristmasEve/presentation.hpp"
 #include "ChristmasEve/snow.hpp"
 #include "GlobalNamespace/ResultsViewController.hpp"
+#include "GlobalNamespace/FireworkItemController.hpp"
+#include "GlobalNamespace/RankModel.hpp"
 #include "GlobalNamespace/LevelCompletionResults.hpp"
 #include "GlobalNamespace/MediaAsyncLoader.hpp"
 #include "UnityEngine/AudioSource.hpp"
@@ -255,9 +257,13 @@ static void RestoreSelectedSnow() {
     }
 }
 
-namespace { void StopCelebration(); }
+namespace {
+    void StopCelebration();
+    void RestoreResultsFireworks();
+}
 
 static void ClearThemeDecor() {
+    RestoreResultsFireworks();
     if (lastDecorTheme != currentTheme) {
         Seasonal::autumnLeaves::DestroyAutumnLeaves();
         if (lastDecorTheme == Theme::Halloween) Halloween::ghostDrift::EndResultsScreen();
@@ -565,6 +571,72 @@ static void RefreshLights() {
 }
 
 namespace {
+    struct SuppressedFirework {
+        SafePtrUnity<ParticleSystem> particles;
+        bool emissionEnabled;
+    };
+    std::vector<SuppressedFirework> suppressedFireworks;
+    bool replaceResultsFireworks = false;
+    struct SuppressedFireworkLight {
+        SafePtrUnity<FireworkItemController> controller;
+        float intensity;
+    };
+    std::vector<SuppressedFireworkLight> suppressedFireworkLights;
+
+    void SuppressFirework(FireworkItemController* controller) {
+        if (!controller) return;
+        auto object = controller->get_gameObject();
+        if (!object || !object->get_activeInHierarchy()) return;
+        if (std::none_of(suppressedFireworkLights.begin(), suppressedFireworkLights.end(),
+                         [controller](const auto& saved) {
+            return saved.controller && saved.controller.ptr() == controller;
+        })) {
+            suppressedFireworkLights.push_back({controller, controller->__cordl_internal_get__directionalLightIntensity()});
+        }
+        controller->set_directionalLightIntensity(0.0f);
+        controller->SetLightsColor(0.0f);
+        auto systems = controller->__cordl_internal_get__particleSystems();
+        if (!systems) return;
+        for (auto* entry : systems) {
+            if (!entry || !entry->_particleSystem) continue;
+            auto* particles = entry->_particleSystem.ptr();
+            auto emission = particles->emission;
+            if (std::none_of(suppressedFireworks.begin(), suppressedFireworks.end(), [particles](const auto& saved) {
+                return saved.particles && saved.particles.ptr() == particles;
+            })) {
+                suppressedFireworks.push_back({particles, emission.get_enabled()});
+            }
+            emission.set_enabled(false);
+            particles->Clear(false);
+        }
+    }
+
+    bool IsCelebrationResult(LevelCompletionResults* result) {
+        return result && result->__cordl_internal_get_levelEndStateType() == LevelCompletionResults::LevelEndStateType::Cleared &&
+               result->__cordl_internal_get_rank().value__ >= RankModel::Rank::S.value__;
+    }
+
+    void PrepareResultsFireworks(LevelCompletionResults* result) {
+        if (replaceResultsFireworks || !IsCelebrationResult(result) ||
+            (currentTheme != Theme::Halloween && currentTheme != Theme::ChristmasEve)) return;
+        replaceResultsFireworks = true;
+        for (auto* controller : Resources::FindObjectsOfTypeAll<FireworkItemController*>()) {
+            SuppressFirework(controller);
+        }
+    }
+
+    void RestoreResultsFireworks() {
+        replaceResultsFireworks = false;
+        for (auto& saved : suppressedFireworkLights) {
+            if (saved.controller) saved.controller->set_directionalLightIntensity(saved.intensity);
+        }
+        suppressedFireworkLights.clear();
+        for (auto& saved : suppressedFireworks) {
+            if (saved.particles) saved.particles->emission.set_enabled(saved.emissionEnabled);
+        }
+        suppressedFireworks.clear();
+    }
+
     SafePtrUnity<GameObject> celebrationHost;
     SafePtrUnity<AudioClip> celebrationClip;
     bool celebrationActive = false;
@@ -617,18 +689,48 @@ namespace {
             })));
     }
 }
+MAKE_HOOK_MATCH(SeasonalFireworkInit, &FireworkItemController::InitializeParticleSystem,
+    void, FireworkItemController* self) {
+    SeasonalFireworkInit(self);
+    if (replaceResultsFireworks) SuppressFirework(self);
+}
+
+MAKE_HOOK_MATCH(SeasonalFireworkSound, &FireworkItemController::PlayExplosionSound,
+    void, FireworkItemController* self) {
+    if (!replaceResultsFireworks) SeasonalFireworkSound(self);
+}
+
+MAKE_HOOK_MATCH(SeasonalFireworkLights, &FireworkItemController::SetLightsColor,
+    void, FireworkItemController* self, float intensity) {
+    SeasonalFireworkLights(self, replaceResultsFireworks ? 0.0f : intensity);
+}
+
+MAKE_HOOK_MATCH(SeasonalFireworkFire, &FireworkItemController::Fire,
+    void, FireworkItemController* self) {
+    if (replaceResultsFireworks) SuppressFirework(self);
+    SeasonalFireworkFire(self);
+}
+
+MAKE_HOOK_MATCH(SeasonalResultsInit, &ResultsViewController::Init,
+    void, ResultsViewController* self, LevelCompletionResults* result, IReadonlyBeatmapData* beatmapData,
+    ByRef<BeatmapKey> key, BeatmapLevel* level, bool practice, bool newHighScore) {
+    RestoreResultsFireworks();
+    PrepareResultsFireworks(result);
+    SeasonalResultsInit(self, result, beatmapData, key, level, practice, newHighScore);
+}
+
 MAKE_HOOK_MATCH(SeasonalResultsOpen, &ResultsViewController::DidActivate,
     void, ResultsViewController* self, bool first, bool added, bool enabling) {
+    auto* result = self ? self->__cordl_internal_get__levelCompletionResults() : nullptr;
+    if (added) PrepareResultsFireworks(result);
     SeasonalResultsOpen(self, first, added, enabling);
-    if (!added || !self) return;
-    auto* result = self->__cordl_internal_get__levelCompletionResults();
-    if (!result || result->__cordl_internal_get_rank().value__ < 5) return;
+    if (!added || !IsCelebrationResult(result)) return;
     if (currentTheme == Theme::ChristmasEve) ChristmasEve::aurora::BeginResults();
     if (currentTheme == Theme::NewYears) StartCelebration();
     if (currentTheme == Theme::Halloween) {
         Halloween::ghostDrift::SetResultsScreen(self, true);
         Halloween::ghostSting::EnterResults();
-        Halloween::ghostDrift::Begin();
+        if (!Halloween::ghostDrift::Begin()) RestoreResultsFireworks();
     }
 }
 
@@ -639,6 +741,7 @@ MAKE_HOOK_MATCH(SeasonalResultsClose, &ResultsViewController::DidDeactivate,
     Halloween::ghostSting::ExitResults();
     Halloween::ghostDrift::EndResultsScreen();
     SeasonalResultsClose(self, removed, disabling);
+    RestoreResultsFireworks();
 }
 
 extern "C" __attribute__((visibility("default"))) void setup(CModInfo* info) noexcept { *info = modInfo.to_c(); }
@@ -650,6 +753,11 @@ extern "C" __attribute__((visibility("default"))) void late_load() noexcept {
     INSTALL_HOOK(PaperLogger, SeasonalMenuDidActivate);
     INSTALL_HOOK(PaperLogger, SeasonalMenuLighting);
     INSTALL_HOOK(PaperLogger, MenuFloorSetPropertyBlock);
+    INSTALL_HOOK(PaperLogger, SeasonalResultsInit);
+    INSTALL_HOOK(PaperLogger, SeasonalFireworkFire);
+    INSTALL_HOOK(PaperLogger, SeasonalFireworkInit);
+    INSTALL_HOOK(PaperLogger, SeasonalFireworkSound);
+    INSTALL_HOOK(PaperLogger, SeasonalFireworkLights);
     INSTALL_HOOK(PaperLogger, SeasonalResultsOpen);
     INSTALL_HOOK(PaperLogger, SeasonalResultsClose);
     INSTALL_HOOK(PaperLogger, SeasonalSongPlayerEnable);
